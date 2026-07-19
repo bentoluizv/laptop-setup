@@ -24,10 +24,22 @@
   ansible.builtin.command: /bin/bash /tmp/nvm-installer.sh
   environment:
     NVM_DIR: "{{ nvm_dir }}"
-    PROFILE: "{{ target_home }}/.profile"
+    PROFILE: /dev/null
   when: not nvm_script.stat.exists
   become: false
   changed_when: true
+
+- name: Add nvm to the shell environment
+  ansible.builtin.blockinfile:
+    path: "{{ shell_rc_file }}"
+    create: true
+    mode: "0644"
+    marker: "# {mark} ANSIBLE MANAGED: nvm"
+    block: |
+      export NVM_DIR="{{ nvm_dir }}"
+      [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+      [ -s "$NVM_DIR/bash_completion" ] && . "$NVM_DIR/bash_completion"
+  become: false
 
 - name: Remove the nvm installer
   ansible.builtin.file:

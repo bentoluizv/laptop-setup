@@ -201,8 +201,11 @@ Use an `https://` URL so it works under `ansible-pull` before any SSH key
 exists. A real file already at a link target is moved to
 `<name>.bak.<timestamp>` first.
 
-Leave `~/.profile` out of the repo: the playbook writes managed blocks into it
-for uv, nvm, Go and cargo. Put your own customisations in `.bashrc`.
+Leave `~/.bashrc` out of the repo: the playbook writes managed blocks into it
+for uv, nvm, Go and cargo. The target is `shell_rc_file` — point it at
+`.zshrc` if you use zsh. It has to be a file your **interactive** shell reads:
+`~/.profile` is only read by login shells, so tools installed there are
+missing from a normal terminal tab.
 
 If your repo has its own install script, set `dotfiles_install_script` to its
 path relative to the repo root and it runs after cloning, instead of using

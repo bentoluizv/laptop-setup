@@ -209,8 +209,11 @@ Use uma URL `https://` para funcionar com `ansible-pull` antes de existir
 qualquer chave SSH. Um arquivo real que já esteja no destino do link é movido
 antes para `<nome>.bak.<timestamp>`.
 
-Deixe o `~/.profile` fora do repositório: o playbook escreve blocos gerenciados
-nele para uv, nvm, Go e cargo. Coloque suas personalizações no `.bashrc`.
+Deixe o `~/.bashrc` fora do repositório: o playbook escreve blocos gerenciados
+nele para uv, nvm, Go e cargo. O destino é o `shell_rc_file` — aponte para o
+`.zshrc` se você usa zsh. Precisa ser um arquivo que o seu shell **interativo**
+leia: o `~/.profile` só é lido por shells de login, então ferramentas
+instaladas ali somem em uma aba normal do terminal.
 
 Se o seu repositório tiver um script de instalação próprio, defina
 `dotfiles_install_script` com o caminho relativo à raiz dele; o script roda

@@ -66,7 +66,7 @@
 
 - name: Add cargo to the shell environment
   ansible.builtin.blockinfile:
-    path: "{{ target_home }}/.profile"
+    path: "{{ shell_rc_file }}"
     create: true
     mode: "0644"
     marker: "# {mark} ANSIBLE MANAGED: rust"

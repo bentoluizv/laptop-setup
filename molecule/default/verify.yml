@@ -7,6 +7,7 @@
   vars:
     expected_profile_blocks: >-
       {{ (dev_tools_languages.python.enabled | bool) | int
+         + (dev_tools_languages.node.enabled | bool) | int
          + (dev_tools_languages.go.enabled | bool) | int
          + (dev_tools_languages.rust.enabled | bool) | int }}
     expected_apt_binaries:
@@ -80,7 +81,7 @@
 
     - name: Confirm the shell environment blocks were written exactly once
       ansible.builtin.shell:
-        cmd: "grep -c 'BEGIN ANSIBLE MANAGED' {{ target_home }}/.profile"
+        cmd: "grep -c 'BEGIN ANSIBLE MANAGED' {{ shell_rc_file }}"
         executable: /bin/bash
       register: profile_blocks
       changed_when: false
