@@ -1,5 +1,7 @@
 # laptop-setup
 
+[![CI](https://github.com/bentoluizv/laptop-setup/actions/workflows/ci.yml/badge.svg)](https://github.com/bentoluizv/laptop-setup/actions/workflows/ci.yml)
+
 Ansible configuration for an Ubuntu laptop. Run it on a fresh machine, and
 rerun it any time — it is idempotent.
 
@@ -188,9 +190,10 @@ path relative to the repo root and it runs after cloning, instead of using
 
 **`Timed out waiting for become success or become password prompt`**
 
-Ubuntu 25.10+ ships `sudo-rs`, which Ansible cannot drive. `group_vars/all.yml`
-points `ansible_become_exe` at `/usr/bin/sudo.ws` when present. If that binary
-is missing, install it:
+Ubuntu 25.10+ ships `sudo-rs`, which Ansible cannot drive. The playbook detects
+this before anything runs: it looks for the classic `/usr/bin/sudo.ws` on the
+target and points `ansible_become_exe` at it. If that binary is missing you get
+a preflight failure naming the fix rather than a timeout. Install it with:
 
 ```bash
 sudo apt install sudo

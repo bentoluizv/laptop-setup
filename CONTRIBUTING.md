@@ -64,16 +64,35 @@ Then add it, and test as below.
 ## Testing a change
 
 Nothing is accepted without an idempotency check. Four levels, cheapest first.
-CI runs all of them on every push and pull request.
+
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs all of them on every
+push and pull request, in three jobs:
+
+| Job | Covers |
+| --- | --- |
+| `Lint` | yamllint + ansible-lint |
+| `Converge and idempotence (container)` | `molecule test` — everything except the `docker` and `apps` tags |
+| `Full playbook on a real VM` | the whole playbook twice on a runner, then the verify assertions |
+
+You do not need all of this locally. Level 1 and a twice-run on your own machine
+catch most things; let CI do the container and VM work.
 
 **1. Syntax and lint**
 
 ```bash
+sudo apt install ansible-lint yamllint    # or: pipx install ansible-lint yamllint
 ansible-playbook -i inventory.ini playbook.yml --syntax-check
-pipx install ansible-lint yamllint    # or: sudo apt install ansible-lint yamllint
 yamllint .
 ansible-lint
 ```
+
+Lint config lives in [`.yamllint`](.yamllint) and
+[`.ansible-lint`](.ansible-lint). Four rules are skipped deliberately:
+`role-name` (the role directories are hyphenated by project layout),
+`var-naming[no-role-prefix]` (`target_user`, `deb_arch` and friends are shared
+across roles on purpose), and `command-instead-of-module` /
+`risky-shell-pipe` (the uv, nvm and rustup installers are upstream scripts
+piped into a shell, which `get_url` cannot do).
 
 **2. Dry run**
 
@@ -101,6 +120,10 @@ end state is correct.
 pip install molecule "molecule-plugins[docker]" docker
 molecule test
 ```
+
+This needs a working Docker. If you have just run the playbook for the first
+time, log out and back in first — the `docker` group is not active in the
+session that added you to it.
 
 The default sequence creates an `ubuntu:26.04` container, converges the
 playbook, runs it a **second time and fails if anything reports `changed`**,
@@ -224,6 +247,13 @@ fighting the one Ansible writes and producing a permanent `changed`. Use
 **Architecture and version assumptions.** `deb_arch` maps only x86_64 and
 aarch64. Version strings must be fully qualified where upstream has no
 redirect for a partial one.
+
+**Filesystem tests that run on the wrong machine.** Jinja tests like
+`'/some/path' is exists` evaluate on the **controller**, not the target. For a
+local-connection run they are the same host, so a mistake here stays invisible
+until the playbook runs against a container or a remote machine. Inspect the
+target with `ansible.builtin.stat` and a `set_fact` instead. This is exactly
+how `ansible_become_exe` was wrong until molecule exposed it.
 
 ## Git flow
 

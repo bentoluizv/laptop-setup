@@ -116,11 +116,16 @@ not the normal path.
 
 **Privilege escalation.** `become: false` at play level; `become: true` on
 individual tasks only. Everything under `$HOME` runs unprivileged.
-`ansible_become_exe` in `group_vars/all.yml` points at `/usr/bin/sudo.ws` when
-present: Ubuntu 25.10+ ships `sudo-rs`, which wraps Ansible's `-p` prompt in its
-own template so Ansible never matches it and every privileged task times out.
-Preflight asserts in `playbook.yml` catch this, and an unsupported architecture,
-before anything runs.
+Ubuntu 25.10+ ships `sudo-rs`, which wraps Ansible's `-p` prompt in its own
+template, so Ansible never matches it and every privileged task times out. The
+`pre_tasks` in `playbook.yml` stat `/usr/bin/sudo.ws` **on the target** and
+`set_fact` `ansible_become_exe` to it when present, then assert that the active
+sudo is drivable. Architecture is asserted there too.
+
+That stat is deliberately target-side. It was once a `group_vars` expression
+using the `exists` test, which evaluates on the **controller** — correct only
+because this is normally a local connection, and wrong the moment the playbook
+runs against a container or any other host.
 
 ## Conventions
 
