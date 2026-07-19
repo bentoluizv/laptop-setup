@@ -21,6 +21,8 @@ provisioner:
     ANSIBLE_ROLES_PATH: ../../roles
     ANSIBLE_STDOUT_CALLBACK: default
   inventory:
+    links:
+      group_vars: ../../group_vars
     host_vars:
       laptop-setup-ubuntu:
         ansible_user: laptop
