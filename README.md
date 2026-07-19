@@ -135,7 +135,6 @@ then add the package name to `apt_packages`. Optional keys:
 | --- | --- |
 | `key_armored: false` | Vendor serves a binary `.gpg` keyring rather than an armored `.asc` |
 | `self_managed_marker: <path>` | Once this file exists the vendor manages the repo itself; ours is removed and no longer re-added |
-| `disable_vendor_repo_add: true` | Writes `/etc/default/<name>` to stop the package re-adding its own source |
 | `debconf:` | Preseed a debconf answer before the package installs; takes `name`, `question`, `vtype`, `value` |
 
 ## Add a role

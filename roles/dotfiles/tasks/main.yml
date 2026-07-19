@@ -41,7 +41,10 @@
 
     - name: Move real files aside, preserving any earlier backup
       ansible.builtin.command:
-        cmd: "mv {{ item.stat.path }} {{ item.stat.path }}.bak.{{ dotfiles_backup_suffix }}"
+        argv:
+          - mv
+          - "{{ item.stat.path }}"
+          - "{{ item.stat.path }}.bak.{{ dotfiles_backup_suffix }}"
         creates: "{{ item.stat.path }}.bak.{{ dotfiles_backup_suffix }}"
       loop: "{{ link_targets.results }}"
       loop_control:

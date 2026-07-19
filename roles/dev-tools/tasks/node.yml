@@ -62,7 +62,8 @@
       nvm install {{ node_install_spec }} &&
       nvm alias default '{{ node_default_alias }}'
     executable: /bin/bash
-  when: node_target not in nvm_ls.stdout
+  when: >-
+    not (nvm_ls.stdout is search('(?m)' ~ (node_target | regex_escape) ~ '(\.|\s|$)'))
   become: false
 
 - name: List globally installed npm packages
@@ -81,6 +82,6 @@
     executable: /bin/bash
   loop: "{{ npm_global_packages }}"
   when: >-
-    (item | regex_replace('(?<!^)@[^@]*$', ''))
-    not in (npm_global_installed.stdout | default(''))
+    not ((npm_global_installed.stdout | default('')) is search(
+      '(?m)/' ~ (item | regex_replace('(?<!^)@[^@]*$', '') | regex_escape) ~ '$'))
   become: false

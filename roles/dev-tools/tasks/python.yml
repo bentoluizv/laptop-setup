@@ -33,12 +33,19 @@
   when: "'cpython-' ~ item not in (uv_python_installed.stdout | default(''))"
   become: false
 
+- name: Check whether the bare python shim exists
+  ansible.builtin.stat:
+    path: "{{ uv_bin_dir }}/python"
+  register: uv_python_shim
+  when: dev_tools_languages.python.default | length > 0
+
 - name: Install python/python3 executables for {{ dev_tools_languages.python.default }}
   ansible.builtin.command: >-
     {{ uv_bin_dir }}/uv python install
     {{ dev_tools_languages.python.default }} --default
-  when: dev_tools_languages.python.default | length > 0
-  changed_when: false
+  when:
+    - dev_tools_languages.python.default | length > 0
+    - not (uv_python_shim.stat.exists | default(false))
   become: false
 
 - name: Add uv to the shell environment

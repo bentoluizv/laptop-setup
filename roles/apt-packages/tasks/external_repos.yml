@@ -17,19 +17,6 @@
   loop_control:
     label: "{{ item.name }}"
 
-- name: Stop vendor packages from re-adding their own source files
-  ansible.builtin.copy:
-    content: |
-      repo_add_once="false"
-      repo_reenable_on_distupgrade="false"
-    dest: "/etc/default/{{ item.name }}"
-    mode: "0644"
-  become: true
-  loop: "{{ external_repos }}"
-  loop_control:
-    label: "{{ item.name }}"
-  when: item.disable_vendor_repo_add | default(false)
-
 - name: Preseed debconf answers for vendor packages
   ansible.builtin.debconf:
     name: "{{ item.debconf.name }}"

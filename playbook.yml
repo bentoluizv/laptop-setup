@@ -14,6 +14,35 @@
           {{ ansible_facts['distribution'] }} {{ ansible_facts['distribution_version'] }}.
       tags: [always]
 
+    - name: Verify we are on a supported architecture
+      ansible.builtin.assert:
+        that:
+          - ansible_facts['architecture'] in ['x86_64', 'aarch64']
+        fail_msg: >-
+          deb_arch only maps x86_64 and aarch64, but found
+          {{ ansible_facts['architecture'] }}. Continuing would download
+          arm64 artifacts and write arch=arm64 apt lines for this machine.
+      tags: [always]
+
+    - name: Resolve which sudo implementation is active
+      ansible.builtin.command: readlink -f /usr/bin/sudo
+      register: sudo_impl
+      changed_when: false
+      failed_when: false
+      tags: [always]
+
+    - name: Verify Ansible can drive the active sudo
+      ansible.builtin.assert:
+        that:
+          - ansible_become_exe != 'sudo' or 'cargo' not in sudo_impl.stdout
+        fail_msg: >-
+          /usr/bin/sudo resolves to sudo-rs ({{ sudo_impl.stdout | trim }}),
+          which Ansible cannot drive, and the classic /usr/bin/sudo.ws is not
+          installed. Every privileged task would fail with an unexplained
+          become timeout. Install the classic sudo first:
+          sudo apt install sudo
+      tags: [always]
+
     - name: Warn when running as root outside ansible-pull
       ansible.builtin.debug:
         msg: >-
@@ -50,11 +79,20 @@
       when: docker_group_changed | default(false)
       tags: [always]
 
+    - name: Check whether the mkcert local CA is already installed
+      ansible.builtin.stat:
+        path: "{{ target_home }}/.local/share/mkcert/rootCA.pem"
+      register: mkcert_ca
+      when: "'ddev' in apt_packages"
+      tags: [always]
+
     - name: Remind about the one-time mkcert setup for DDEV
       ansible.builtin.debug:
         msg: >-
           DDEV is installed. For https on local sites, run `mkcert -install`
           once. It installs a local root CA into your system trust store —
           review that before running it. `mkcert -uninstall` reverses it.
-      when: "'ddev' in apt_packages"
+      when:
+        - "'ddev' in apt_packages"
+        - not (mkcert_ca.stat.exists | default(false))
       tags: [always]
