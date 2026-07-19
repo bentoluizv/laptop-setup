@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# Enforces Conventional Commits 1.0.0 on the subject line.
+# https://www.conventionalcommits.org/en/v1.0.0/
+set -uo pipefail
+
+msg_file=$1
+subject=$(head -1 "$msg_file")
+
+# Ignore merges, reverts, fixups and comment-only buffers.
+case "$subject" in
+  Merge*|Revert*|fixup!*|squash!*|"#"*|"") exit 0 ;;
+esac
+
+types="build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test"
+pattern="^(${types})(\([a-z0-9._/-]+\))?!?: .+"
+
+if ! printf '%s' "$subject" | grep -qE "$pattern"; then
+  cat >&2 <<EOF
+commit-msg: subject does not follow Conventional Commits.
+
+  got:      $subject
+  expected: <type>[optional scope][!]: <description>
+
+  types:    ${types//|/, }
+  examples: feat(docker): add rootless mode
+            fix: anchor the npm installed-check
+            docs(pt-br): translate the README
+            feat!: drop support for Ubuntu 22.04
+
+  See https://www.conventionalcommits.org/en/v1.0.0/
+EOF
+  exit 1
+fi
+
+if [ "${#subject}" -gt 72 ]; then
+  echo "commit-msg: subject is ${#subject} characters, keep it under 72." >&2
+  exit 1
+fi
+
+# A body, when present, must be separated from the subject by a blank line.
+second=$(sed -n '2p' "$msg_file")
+if [ -n "$second" ]; then
+  echo "commit-msg: leave a blank line between the subject and the body." >&2
+  exit 1
+fi

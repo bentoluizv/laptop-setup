@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# Runs the same lint CI runs, on staged files only.
+# Enable with: git config core.hooksPath .githooks
+set -uo pipefail
+
+fail=0
+staged=$(git diff --cached --name-only --diff-filter=ACM)
+[ -z "$staged" ] && exit 0
+
+yaml_staged=$(printf '%s\n' "$staged" | grep -E '\.(yml|yaml)$' || true)
+
+if [ -n "$yaml_staged" ]; then
+  if command -v yamllint >/dev/null 2>&1; then
+    # shellcheck disable=SC2086
+    yamllint $yaml_staged || fail=1
+  else
+    echo "pre-commit: yamllint not installed, skipping (sudo apt install yamllint)"
+  fi
+
+  if command -v ansible-lint >/dev/null 2>&1; then
+    ansible-lint --offline -q || fail=1
+  else
+    echo "pre-commit: ansible-lint not installed, skipping (sudo apt install ansible-lint)"
+  fi
+
+  if command -v ansible-playbook >/dev/null 2>&1; then
+    ansible-playbook -i inventory.ini playbook.yml --syntax-check >/dev/null || fail=1
+  fi
+fi
+
+if [ "$fail" -ne 0 ]; then
+  echo
+  echo "pre-commit: lint failed. Fix the issues above, or bypass with --no-verify."
+  exit 1
+fi
