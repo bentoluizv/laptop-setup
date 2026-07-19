@@ -97,7 +97,9 @@ uv_version: "0.11.29"
 uv_installer_sha256: "504a79fd2ed0dcd47e7f04f0792cfd0871f62e24a7fe40fa8ae0f563a369f2bd"
 nvm_installer_sha256: "abdb525ee9f5b48b34d8ed9fc67c6013fb0f659712e401ecd88ab989b3af8f53"
 rustup_dist_url: "https://static.rust-lang.org/rustup/dist"
-rustup_target: "{{ 'x86_64-unknown-linux-gnu' if ansible_facts['architecture'] == 'x86_64' else 'aarch64-unknown-linux-gnu' }}"
+rustup_target: >-
+  {{ 'x86_64-unknown-linux-gnu' if ansible_facts['architecture'] == 'x86_64'
+  else 'aarch64-unknown-linux-gnu' }}
 go_install_dir: "/usr/local"
 cargo_home: "{{ target_home }}/.cargo"
 rustup_home: "{{ target_home }}/.rustup"
