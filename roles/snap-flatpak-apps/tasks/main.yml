@@ -28,7 +28,7 @@
         name: flatpak
         state: present
 
-    - name: Add the {{ flatpak_remote_name }} remote
+    - name: "Add the flatpak remote: {{ flatpak_remote_name }}"
       community.general.flatpak_remote:
         name: "{{ flatpak_remote_name }}"
         flatpakrepo_url: "{{ flatpak_remote_url }}"

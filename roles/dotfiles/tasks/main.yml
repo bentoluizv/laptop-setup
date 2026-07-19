@@ -79,3 +79,4 @@
   when:
     - dotfiles_install_script | length > 0
     - dotfiles_clone.changed
+  changed_when: true

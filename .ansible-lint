@@ -5,7 +5,9 @@ exclude_paths:
   - .github/
 
 skip_list:
+  - role-name
   - command-instead-of-shell
+  - command-instead-of-module
   - risky-shell-pipe
   - package-latest
 

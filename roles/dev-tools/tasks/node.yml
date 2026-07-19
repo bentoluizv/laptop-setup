@@ -23,6 +23,7 @@
     PROFILE: "{{ target_home }}/.profile"
   when: not nvm_script.stat.exists
   become: false
+  changed_when: true
 
 - name: Look up the current LTS Node release
   ansible.builtin.shell:
@@ -65,6 +66,7 @@
   when: >-
     not (nvm_ls.stdout is search('(?m)' ~ (node_target | regex_escape) ~ '(\.|\s|$)'))
   become: false
+  changed_when: true
 
 - name: List globally installed npm packages
   ansible.builtin.shell:
@@ -85,3 +87,4 @@
     not ((npm_global_installed.stdout | default('')) is search(
       '(?m)/' ~ (item | regex_replace('(?<!^)@[^@]*$', '') | regex_escape) ~ '$'))
   become: false
+  changed_when: true

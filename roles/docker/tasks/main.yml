@@ -39,7 +39,7 @@
     enabled: true
   become: true
 
-- name: Add {{ target_user }} to the docker group
+- name: "Add the target account to the docker group: {{ target_user }}"
   ansible.builtin.user:
     name: "{{ target_user }}"
     groups: docker
