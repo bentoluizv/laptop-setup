@@ -18,7 +18,7 @@ npm_global_packages: []
 npm_global_binaries: []
 
 target_user: "{{ ansible_facts['user_id'] }}"
-target_home: "/home/{{ target_user }}"
+target_home: "{{ '/root' if target_user == 'root' else '/home/' ~ target_user }}"
 deb_arch: "{{ 'amd64' if ansible_facts['architecture'] == 'x86_64' else 'arm64' }}"
 apt_cache_valid_time: 3600
 
