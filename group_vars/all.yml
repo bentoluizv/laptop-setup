@@ -1,0 +1,263 @@
+---
+# ============================================================================
+# Everything you'd want to tweak lives here. Roles read these; role defaults/
+# only exist so a role still works if lifted out of this repo.
+# ============================================================================
+
+# The account being configured. Defaults to whoever runs the playbook, which is
+# what you want locally; override when running under ansible-pull as root.
+target_user: "{{ ansible_facts['user_id'] }}"
+target_home: "/home/{{ target_user }}"
+
+# ---------------------------------------------------------------------------
+# apt-packages role
+# ---------------------------------------------------------------------------
+# Refresh the apt cache if it's older than this (seconds). Keeps reruns fast.
+apt_cache_valid_time: 3600
+
+# Run a full `apt upgrade` on every run. Off by default: it's slow and it makes
+# runs non-deterministic. Enable with -e apt_perform_upgrade=true when you want.
+apt_perform_upgrade: false
+
+# Base CLI/system packages available from Ubuntu's own repos.
+apt_packages:
+  # --- version control -----------------------------------------------------
+  - git
+  # --- fetching over http --------------------------------------------------
+  - curl                  # scriptable http client, prints to stdout
+  - wget                  # recursive/resumable downloader, writes to disk
+  # --- searching and browsing files ---------------------------------------
+  - ripgrep               # fast recursive grep; binary is `rg`
+  - fd-find               # fast `find` alternative; binary is `fdfind` (see note)
+  - fzf                   # interactive fuzzy finder, pipes into anything
+  - tree                  # directory structure as an indented tree
+  # --- inspecting the system ----------------------------------------------
+  - htop                  # interactive process/resource viewer
+  # --- data and archives ---------------------------------------------------
+  - jq                    # query and reshape JSON on the command line
+  - unzip                 # extract .zip archives
+  # --- editing and sessions ------------------------------------------------
+  - vim                   # terminal editor
+  - tmux                  # persistent terminal sessions, survives disconnects
+  # --- from the vendor repos defined below ---------------------------------
+  - google-chrome-stable  # web browser
+  - gh                    # GitHub CLI: PRs, issues, releases, gh auth login
+  - code                  # VS Code (apt build, not the snap)
+  # --- drupal / local dev environments -------------------------------------
+  # DDEV needs a working Docker, which the docker role provides. Keep
+  # docker_enabled true if you keep ddev here.
+  - ddev                  # containerised local dev envs for Drupal etc.
+  - mkcert                # local CA for DDEV's https; see mkcert note in README
+
+# Debian ships fd as `fdfind` (the name `fd` was already taken). This puts an
+# `fd` symlink in ~/.local/bin so muscle memory and shared configs work.
+apt_link_fd: true
+
+# TODO: fill in if needed. Each entry is a `ppa:owner/name` or full repo line.
+# PPAs are added before apt_packages install, so packages from them resolve.
+apt_ppas: []
+  # - ppa:neovim-ppa/unstable
+
+# Debian architecture name, for repo lines that need it.
+deb_arch: "{{ 'amd64' if ansible_facts['architecture'] == 'x86_64' else 'arm64' }}"
+
+# Vendor apt repositories. The key is fetched to /etc/apt/keyrings/<name>.<ext>
+# and referenced via signed-by. Set key_armored: false when the vendor serves a
+# binary .gpg keyring instead of an ASCII-armored .asc one.
+apt_external_repos:
+  - name: google-chrome
+    key_url: https://dl.google.com/linux/linux_signing_key.pub
+    # Google publishes Chrome for linux amd64 only — there is no arm64 build,
+    # so this is pinned rather than following deb_arch.
+    repo: >-
+      deb [arch=amd64 signed-by=/etc/apt/keyrings/google-chrome.asc]
+      https://dl.google.com/linux/chrome/deb/ stable main
+    # The chrome .deb re-adds its own source file on every upgrade, which
+    # would fight the line above and report a change on each run. This writes
+    # /etc/default/google-chrome to switch that behaviour off.
+    disable_vendor_repo_add: true
+
+  - name: github-cli
+    key_url: https://cli.github.com/packages/githubcli-archive-keyring.gpg
+    # GitHub serves a binary keyring, not an armored one.
+    key_armored: false
+    repo: >-
+      deb [arch={{ deb_arch }} signed-by=/etc/apt/keyrings/github-cli.gpg]
+      https://cli.github.com/packages stable main
+
+  - name: ddev
+    key_url: https://pkg.ddev.com/apt/gpg.key
+    # No arch= filter and literal `* *` for suite/component: DDEV's repo is
+    # laid out flat rather than by release, which is what upstream documents.
+    repo: >-
+      deb [signed-by=/etc/apt/keyrings/ddev.asc]
+      https://pkg.ddev.com/apt/ * *
+
+  - name: vscode
+    # Microsoft's docs pipe this through `gpg --dearmor`; that step only
+    # exists to produce a binary keyring, and apt reads the armored file
+    # directly via signed-by, so we skip it and keep the .asc.
+    key_url: https://packages.microsoft.com/keys/microsoft.asc
+    repo: >-
+      deb [arch={{ deb_arch }} signed-by=/etc/apt/keyrings/vscode.asc]
+      https://packages.microsoft.com/repos/code stable main
+    # The code .deb otherwise prompts (via debconf) to add Microsoft's repo
+    # itself, writing its own vscode.sources alongside the vscode.list we
+    # manage here. Two source files for one repo makes apt warn on every
+    # update, so decline it and let Ansible own the repo.
+    debconf:
+      name: code
+      question: code/add-microsoft-repo
+      vtype: boolean
+      value: "false"
+
+# ---------------------------------------------------------------------------
+# dev-tools role
+# ---------------------------------------------------------------------------
+# Compilers, headers, VCS — the stuff most language toolchains need present.
+dev_tools_base_packages:
+  - build-essential
+  - git
+  - curl
+  - ca-certificates
+
+# Per-language toggles + versions. Set enabled: false to skip a runtime
+# entirely; nothing for it will be installed or touched.
+dev_tools_languages:
+  python:
+    # Installs uv itself. Interpreters are not installed here: uv's
+    # python-downloads setting defaults to "automatic", so `uv run`/`uv sync`/
+    # `uv venv` fetch whatever a project's .python-version or requires-python
+    # asks for, on first use. The version a project needs is the project's
+    # business, not the laptop's.
+    enabled: true
+    # Optional preinstall list — only useful to warm the cache (offline work,
+    # slow connection). Leave empty to let projects drive it.
+    versions: []
+      # - "3.12"
+    # Optionally install bare `python`/`python3` shims pointing at this
+    # version, via uv's --default flag (upstream still marks it experimental).
+    # Not needed for the per-project workflow; empty means versioned binaries
+    # only, which keeps the system python untouched.
+    default: ""
+  node:
+    enabled: true
+    # "lts" tracks the newest LTS line: each run resolves what that currently
+    # is and installs it if it's not already there. A new major therefore
+    # arrives on the first run after it's released, without editing this file.
+    # Pin a major instead ("22") if you need runs to be reproducible over time.
+    version: "lts"
+  go:
+    enabled: true
+    # Go has no LTS line — upstream supports the two most recent majors.
+    # "latest" resolves the current stable release at run time; pin like
+    # "1.23.4" if you need reproducibility.
+    version: "latest"
+  rust:
+    enabled: true
+    # rustup toolchain: stable / beta / nightly / pinned like "1.83.0".
+    # "stable" is itself a moving channel.
+    channel: "stable"
+
+# Global npm CLIs, installed into the nvm-managed Node (never with sudo).
+# Requires dev_tools_languages.node.enabled. Pin a version with @x.y.z if you
+# want reproducibility; @latest re-resolves whenever the package is missing.
+npm_global_packages:
+  # Spec-driven planning layer for coding agents — https://openspec.dev/
+  - "@fission-ai/openspec@latest"
+
+# Version-manager install locations (all under $HOME, no sudo).
+uv_bin_dir: "{{ target_home }}/.local/bin"
+# Run `uv self update` on every play. Off by default so runs stay predictable.
+uv_self_update: false
+nvm_dir: "{{ target_home }}/.nvm"
+nvm_version: "v0.40.1"
+go_install_dir: "/usr/local"
+cargo_home: "{{ target_home }}/.cargo"
+# Where rustup keeps toolchains. Separate from cargo_home, and passed to every
+# rustup call so a customised path doesn't diverge from rustup's own default.
+rustup_home: "{{ target_home }}/.rustup"
+# Advance the Rust toolchain on every run. Off by default so runs stay
+# predictable; enable ad hoc with -e rust_update=true.
+rust_update: false
+
+# ---------------------------------------------------------------------------
+# docker role
+# ---------------------------------------------------------------------------
+docker_enabled: true
+# Ubuntu codename used for the apt repo. Auto-detected; override for a distro
+# Docker hasn't published for yet (e.g. set to "noble" on a newer release).
+docker_apt_codename: "{{ ansible_facts['distribution_release'] }}"
+docker_packages:
+  - docker-ce
+  - docker-ce-cli
+  - containerd.io
+  - docker-buildx-plugin
+  - docker-compose-plugin
+# Adds target_user to the docker group. Note: this grants root-equivalent
+# access to the machine. Set false to keep sudo-only docker.
+docker_add_user_to_group: true
+# Written to /etc/docker/daemon.json. Empty dict = leave the file alone.
+docker_daemon_options: {}
+  # log-driver: "json-file"
+  # log-opts:
+  #   max-size: "100m"
+
+# ---------------------------------------------------------------------------
+# dotfiles role
+# ---------------------------------------------------------------------------
+dotfiles_enabled: false
+# TODO: point at your repo. Use https:// for ansible-pull on a fresh machine
+# (no SSH key yet); git@ once the key is in place.
+dotfiles_repo: ""
+dotfiles_version: "main"
+dotfiles_dest: "{{ target_home }}/.dotfiles"
+# If your repo has a bootstrap/install script, name it here (relative to the
+# repo root) and it runs after clone. Leave empty to use dotfiles_links.
+dotfiles_install_script: ""
+# Symlinks to create: src is relative to dotfiles_dest, dest is absolute.
+dotfiles_links: []
+  # - src: gitconfig
+  #   dest: "{{ target_home }}/.gitconfig"
+  # - src: nvim
+  #   dest: "{{ target_home }}/.config/nvim"
+# Move any pre-existing real file out of the way as <name>.bak instead of
+# failing. Set false to make collisions a hard error.
+dotfiles_backup_existing: true
+
+# ---------------------------------------------------------------------------
+# snap-flatpak-apps role
+# ---------------------------------------------------------------------------
+# TODO: add any other GUI apps you want.
+# Plain names install from stable.
+snap_packages:
+  # VS Code is NOT here on purpose — it comes from Microsoft's apt repo, see
+  # apt_packages above. Don't add the `code` snap as well; two installs would
+  # both provide /usr/bin/code and fight over the handler for .desktop files.
+  #
+  # AWS CLI v2. AWS publishes and supports this snap, and it auto-refreshes.
+  # It is not in apt at all; the alternative is AWS's zip installer, which
+  # needs a --update flag on reinstall and no version tracking. Use that
+  # instead if you ever need to pin a specific minor version.
+  #
+  # The channel is NOT optional. This snap's latest/stable still tracks v1
+  # (verified: latest/stable = 1.45.46, v2/stable = 2.35.21), so the default
+  # channel would quietly install AWS CLI v1. The snap's own description
+  # claims plain --classic gives v2; the channel map says otherwise.
+  - name: aws-cli
+    classic: true
+    channel: v2/stable
+  # - name: slack
+  # - name: nvim
+  #   channel: latest/edge
+
+# Install and configure flatpak + flathub remote. Leave false if you only
+# want snaps.
+flatpak_enabled: false
+flatpak_remote_name: flathub
+flatpak_remote_url: https://dl.flathub.org/repo/flathub.flatpakrepo
+
+# TODO: fill in. Use the full application ID.
+flatpak_packages: []
+  # - com.spotify.Client
+  # - org.gimp.GIMP

@@ -1,0 +1,56 @@
+---
+- name: Install apt prerequisites
+  ansible.builtin.apt:
+    name:
+      - ca-certificates
+      - curl
+      - gnupg
+    state: present
+    update_cache: true
+    cache_valid_time: "{{ apt_cache_valid_time }}"
+  become: true
+
+# Keyring handling, key rotation and repo registration are shared with the
+# apt-packages role rather than reimplemented here. Duplicating them once cost
+# a key-rotation fix that had to be written twice; this keeps one copy.
+- name: Register Docker's apt repository
+  ansible.builtin.include_role:
+    name: apt-packages
+    tasks_from: external_repos.yml
+  vars:
+    external_repos: "{{ docker_external_repos }}"
+
+- name: Install Docker Engine and the compose plugin
+  ansible.builtin.apt:
+    name: "{{ docker_packages }}"
+    state: present
+  become: true
+
+- name: Configure the Docker daemon
+  ansible.builtin.copy:
+    content: "{{ docker_daemon_options | to_nice_json }}\n"
+    dest: /etc/docker/daemon.json
+    mode: "0644"
+  become: true
+  when: docker_daemon_options | length > 0
+  notify: Restart docker
+
+- name: Ensure Docker is running and enabled at boot
+  ansible.builtin.systemd:
+    name: docker
+    state: started
+    enabled: true
+  become: true
+
+- name: Add {{ target_user }} to the docker group
+  ansible.builtin.user:
+    name: "{{ target_user }}"
+    groups: docker
+    append: true
+  become: true
+  when: docker_add_user_to_group | bool
+  register: docker_group_result
+
+- name: Flag that a re-login is needed
+  ansible.builtin.set_fact:
+    docker_group_changed: "{{ docker_group_result.changed | default(false) }}"

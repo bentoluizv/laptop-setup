@@ -1,0 +1,74 @@
+---
+# uv installs prebuilt standalone Pythons — no compiler, no build deps, no
+# waiting on a CPython build. Everything here lands under $HOME, so no become.
+
+- name: Check whether uv is installed
+  ansible.builtin.stat:
+    path: "{{ uv_bin_dir }}/uv"
+  register: uv_bin
+
+- name: Install uv
+  ansible.builtin.shell:
+    cmd: "curl -LsSf https://astral.sh/uv/install.sh | sh"
+  environment:
+    # We manage the PATH block ourselves below; left to itself the installer
+    # edits ~/.profile on every run and Ansible can't track that.
+    UV_NO_MODIFY_PATH: "1"
+    UV_INSTALL_DIR: "{{ uv_bin_dir }}"
+  when: not uv_bin.stat.exists
+  become: false
+
+- name: Update uv in place
+  ansible.builtin.command: "{{ uv_bin_dir }}/uv self update"
+  register: uv_update
+  changed_when: "'Upgraded uv' in uv_update.stdout"
+  # Opt-in: a self-update on every run makes the outcome depend on the day.
+  when: uv_self_update | bool
+  become: false
+
+# uv's python-downloads setting defaults to "automatic": `uv run`, `uv sync`,
+# and `uv venv` fetch whatever interpreter a project asks for via its
+# .python-version or requires-python, without anything preinstalled here.
+# So this list is normally empty. Populate it only to warm the cache — say
+# for working offline, or to avoid a first-use download on a slow link.
+- name: Check which Python versions uv already has
+  ansible.builtin.command: "{{ uv_bin_dir }}/uv python list --only-installed"
+  register: uv_python_installed
+  changed_when: false
+  when: dev_tools_languages.python.versions | length > 0
+  become: false
+
+- name: Preinstall Python versions
+  ansible.builtin.command: "{{ uv_bin_dir }}/uv python install {{ item }}"
+  loop: "{{ dev_tools_languages.python.versions }}"
+  # `uv python install` is a no-op when the version is present, but checking
+  # first keeps the run summary honest about what actually changed.
+  when: "'cpython-' ~ item not in (uv_python_installed.stdout | default(''))"
+  become: false
+
+- name: Install python/python3 executables for {{ dev_tools_languages.python.default }}
+  ansible.builtin.command: >-
+    {{ uv_bin_dir }}/uv python install
+    {{ dev_tools_languages.python.default }} --default
+  # --default is still flagged experimental upstream, so it's opt-in: leave
+  # python.default empty and you just get versioned pythonX.Y binaries.
+  when: dev_tools_languages.python.default | length > 0
+  changed_when: false
+  become: false
+
+- name: Add uv to the shell environment
+  ansible.builtin.blockinfile:
+    path: "{{ target_home }}/.profile"
+    create: true
+    mode: "0644"
+    marker: "# {mark} ANSIBLE MANAGED: uv"
+    block: |
+      export PATH="{{ uv_bin_dir }}:$PATH"
+  become: false
+
+- name: Remove the retired pyenv shell block
+  ansible.builtin.blockinfile:
+    path: "{{ target_home }}/.profile"
+    marker: "# {mark} ANSIBLE MANAGED: pyenv"
+    state: absent
+  become: false

@@ -1,0 +1,91 @@
+---
+# Nothing here needs root: it all happens inside the user's own home.
+- name: Require a dotfiles repo URL
+  ansible.builtin.assert:
+    that: dotfiles_repo | length > 0
+    fail_msg: >-
+      dotfiles_enabled is true but dotfiles_repo is empty.
+      Set it in group_vars/all.yml.
+
+- name: Install git
+  ansible.builtin.apt:
+    name: git
+    state: present
+  become: true
+
+- name: Clone the dotfiles repo
+  ansible.builtin.git:
+    repo: "{{ dotfiles_repo }}"
+    dest: "{{ dotfiles_dest }}"
+    version: "{{ dotfiles_version }}"
+    # Pull updates on rerun, but never discard local commits or edits.
+    update: true
+    force: false
+  register: dotfiles_clone
+
+- name: Back up existing files that are in the way
+  when: dotfiles_backup_existing | bool
+  block:
+    # Facts may not have been gathered if this role is reused in another play,
+    # and an undefined date_time would fail the backup task — leaving the
+    # symlink task to destroy the very file it was meant to preserve.
+    - name: Establish a backup suffix
+      ansible.builtin.set_fact:
+        dotfiles_backup_suffix: >-
+          {{ ansible_facts['date_time']['epoch']
+             if 'date_time' in ansible_facts
+             else lookup('pipe', 'date +%s') }}
+
+    - name: Look for conflicting paths
+      ansible.builtin.stat:
+        path: "{{ item.dest }}"
+      loop: "{{ dotfiles_links }}"
+      loop_control:
+        label: "{{ item.dest }}"
+      register: link_targets
+
+    # The backup name carries a timestamp. A fixed ".bak" plus `creates:` would
+    # silently skip the move once a backup already existed — and the symlink
+    # task below runs with force, so the displaced real file would be deleted
+    # rather than preserved. Losing a user's edited dotfile is not an
+    # acceptable failure mode, so every displaced file gets its own backup.
+    - name: Move real files aside, preserving any earlier backup
+      ansible.builtin.command:
+        cmd: "mv {{ item.stat.path }} {{ item.stat.path }}.bak.{{ dotfiles_backup_suffix }}"
+        # Only fires for a real file/dir, never for a symlink we manage.
+        creates: "{{ item.stat.path }}.bak.{{ dotfiles_backup_suffix }}"
+      loop: "{{ link_targets.results }}"
+      loop_control:
+        label: "{{ item.item.dest }}"
+      when:
+        - item.stat.exists
+        - not item.stat.islnk
+
+- name: Ensure parent directories exist
+  ansible.builtin.file:
+    path: "{{ item.dest | dirname }}"
+    state: directory
+    mode: "0755"
+  loop: "{{ dotfiles_links }}"
+  loop_control:
+    label: "{{ item.dest | dirname }}"
+
+- name: Symlink dotfiles into place
+  ansible.builtin.file:
+    src: "{{ dotfiles_dest }}/{{ item.src }}"
+    dest: "{{ item.dest }}"
+    state: link
+    force: "{{ dotfiles_backup_existing | bool }}"
+  loop: "{{ dotfiles_links }}"
+  loop_control:
+    label: "{{ item.dest }}"
+
+- name: Run the repo's install script
+  ansible.builtin.command:
+    cmd: "./{{ dotfiles_install_script }}"
+    chdir: "{{ dotfiles_dest }}"
+  when:
+    - dotfiles_install_script | length > 0
+    # Only after an actual clone/pull — the script is assumed idempotent but
+    # there is no reason to re-run it when nothing changed.
+    - dotfiles_clone.changed

@@ -1,0 +1,50 @@
+---
+# ---------------------------------------------------------------------------
+# Snap
+# ---------------------------------------------------------------------------
+- name: Install snapd
+  ansible.builtin.apt:
+    name: snapd
+    state: present
+    update_cache: true
+    cache_valid_time: "{{ apt_cache_valid_time }}"
+  become: true
+  when: snap_packages | length > 0
+
+- name: Install snap packages
+  community.general.snap:
+    name: "{{ item.name }}"
+    classic: "{{ item.classic | default(false) }}"
+    channel: "{{ item.channel | default('stable') }}"
+    state: present
+  become: true
+  loop: "{{ snap_packages }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+# ---------------------------------------------------------------------------
+# Flatpak
+# ---------------------------------------------------------------------------
+- name: Set up flatpak
+  when: flatpak_enabled | bool
+  become: true
+  block:
+    - name: Install flatpak
+      ansible.builtin.apt:
+        name: flatpak
+        state: present
+
+    - name: Add the {{ flatpak_remote_name }} remote
+      community.general.flatpak_remote:
+        name: "{{ flatpak_remote_name }}"
+        flatpakrepo_url: "{{ flatpak_remote_url }}"
+        method: system
+        state: present
+
+    - name: Install flatpak packages
+      community.general.flatpak:
+        name: "{{ item }}"
+        remote: "{{ flatpak_remote_name }}"
+        method: system
+        state: present
+      loop: "{{ flatpak_packages }}"

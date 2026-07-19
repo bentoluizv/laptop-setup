@@ -1,0 +1,11 @@
+---
+# Install with: ansible-galaxy install -r requirements.yml
+collections:
+  # community.general provides: snap, flatpak, flatpak_remote, timezone, etc.
+  - name: community.general
+    version: ">=8.0.0"
+  # ansible.posix provides: authorized_key, sysctl, mount, etc.
+  - name: ansible.posix
+    version: ">=1.5.0"
+
+roles: []

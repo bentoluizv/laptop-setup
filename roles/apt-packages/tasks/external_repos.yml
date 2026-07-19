@@ -1,0 +1,99 @@
+---
+# Register a set of third-party apt repositories.
+#
+# Included both by this role (for apt_external_repos) and by the docker role
+# via include_role/tasks_from, so there is exactly one implementation of
+# keyring handling, debconf preseeding and repo registration. Anything that
+# needs a vendor repo should call this rather than repeat the steps.
+#
+# Input: `external_repos`, a list of mappings —
+#   name:                    required; names the keyring and the .list file
+#   key_url:                 required; the vendor's signing key
+#   repo:                    required; the full deb line
+#   key_armored:             optional, default true; false for a binary .gpg
+#   disable_vendor_repo_add: optional; writes /etc/default/<name>
+#   debconf:                 optional; {name, question, vtype, value}
+
+- name: Create the apt keyring directory
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: "0755"
+  become: true
+
+# Vendors ship keys in two formats: ASCII-armored (.asc) and binary keyrings
+# (.gpg). apt reads either, but the extension must match the content or
+# `signed-by` fails, so each repo declares which it serves.
+#
+# force: true is load-bearing. get_url defaults to force: false, which
+# downloads only when the destination is missing — so a rotated vendor key
+# would never be picked up, apt would fail with NO_PUBKEY, and rerunning the
+# playbook (the documented repair) could not fix it. With force: true the
+# content is compared and the task reports changed only on a real update.
+- name: Fetch third-party signing keys
+  ansible.builtin.get_url:
+    url: "{{ item.key_url }}"
+    dest: "/etc/apt/keyrings/{{ item.name }}.{{ 'asc' if item.key_armored | default(true) else 'gpg' }}"
+    mode: "0644"
+    force: true
+  become: true
+  loop: "{{ external_repos }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Stop vendor packages from re-adding their own source files
+  ansible.builtin.copy:
+    content: |
+      # Managed by Ansible. The repo is defined in
+      # /etc/apt/sources.list.d/{{ item.name }}.list; this stops the
+      # package's postinst from rewriting it on every upgrade, which
+      # would make each playbook run report a spurious change.
+      repo_add_once="false"
+      repo_reenable_on_distupgrade="false"
+    dest: "/etc/default/{{ item.name }}"
+    mode: "0644"
+  become: true
+  loop: "{{ external_repos }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when: item.disable_vendor_repo_add | default(false)
+
+# Some packages ask debconf at install time whether to add their own apt repo.
+# Answer before the package is installed, or the postinst writes a second
+# source file for a repo we already manage and apt warns about the duplicate
+# on every update. Requires debconf-utils, installed by this role's main.yml.
+- name: Preseed debconf answers for vendor packages
+  ansible.builtin.debconf:
+    name: "{{ item.debconf.name }}"
+    question: "{{ item.debconf.question }}"
+    vtype: "{{ item.debconf.vtype | default('boolean') }}"
+    value: "{{ item.debconf.value }}"
+  become: true
+  loop: "{{ external_repos | selectattr('debconf', 'defined') | list }}"
+  loop_control:
+    label: "{{ item.debconf.question }}"
+
+# update_cache is false here: leaving it on rebuilds the whole apt cache once
+# per repository. The single refresh below does it once, and only when
+# something actually changed.
+- name: Add third-party repositories
+  ansible.builtin.apt_repository:
+    repo: "{{ item.repo }}"
+    filename: "{{ item.name }}"
+    state: present
+    update_cache: false
+  become: true
+  loop: "{{ external_repos }}"
+  loop_control:
+    label: "{{ item.name }}"
+  register: repos_added
+
+- name: Refresh the apt cache after repository changes
+  ansible.builtin.apt:
+    update_cache: true
+  become: true
+  # No cache_valid_time: a repo was just added, so a cache younger than the
+  # TTL would be reused and the new repo's packages would not be installable
+  # in this same run.
+  when: repos_added.changed
+  changed_when: false

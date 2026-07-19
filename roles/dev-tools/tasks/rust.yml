@@ -1,0 +1,62 @@
+---
+# Every rustup call needs the same environment. Setting it only on the
+# installer would leave the later commands reading and writing the default
+# ~/.cargo and ~/.rustup, so a customised cargo_home would silently diverge
+# from where rustup actually keeps its state.
+- name: Check whether rustup is installed
+  ansible.builtin.stat:
+    path: "{{ cargo_home }}/bin/rustup"
+  register: rustup_bin
+
+- name: Install rustup
+  ansible.builtin.shell:
+    cmd: >-
+      curl --proto '=https' --tlsv1.2 -fsSL https://sh.rustup.rs
+      | sh -s -- -y --no-modify-path
+      --default-toolchain {{ dev_tools_languages.rust.channel }}
+  environment:
+    CARGO_HOME: "{{ cargo_home }}"
+    RUSTUP_HOME: "{{ rustup_home }}"
+  when: not rustup_bin.stat.exists
+  become: false
+
+- name: Check the active toolchain
+  ansible.builtin.command: "{{ cargo_home }}/bin/rustup show active-toolchain"
+  environment:
+    CARGO_HOME: "{{ cargo_home }}"
+    RUSTUP_HOME: "{{ rustup_home }}"
+  register: rust_toolchain
+  changed_when: false
+  become: false
+
+- name: Set the default toolchain to {{ dev_tools_languages.rust.channel }}
+  ansible.builtin.command: "{{ cargo_home }}/bin/rustup default {{ dev_tools_languages.rust.channel }}"
+  environment:
+    CARGO_HOME: "{{ cargo_home }}"
+    RUSTUP_HOME: "{{ rustup_home }}"
+  when: dev_tools_languages.rust.channel not in rust_toolchain.stdout
+  become: false
+
+# `stable` is a moving channel, but rustup only advances it when told to.
+# Opt-in, like uv_self_update, so a plain rerun stays predictable.
+- name: Update the Rust toolchain
+  ansible.builtin.command: "{{ cargo_home }}/bin/rustup update {{ dev_tools_languages.rust.channel }}"
+  environment:
+    CARGO_HOME: "{{ cargo_home }}"
+    RUSTUP_HOME: "{{ rustup_home }}"
+  register: rustup_updated
+  changed_when: "'unchanged' not in rustup_updated.stdout"
+  when: rust_update | bool
+  become: false
+
+- name: Add cargo to the shell environment
+  ansible.builtin.blockinfile:
+    path: "{{ target_home }}/.profile"
+    create: true
+    mode: "0644"
+    marker: "# {mark} ANSIBLE MANAGED: rust"
+    block: |
+      export CARGO_HOME="{{ cargo_home }}"
+      export RUSTUP_HOME="{{ rustup_home }}"
+      export PATH="$CARGO_HOME/bin:$PATH"
+  become: false

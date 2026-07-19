@@ -1,0 +1,93 @@
+---
+# Go has no LTS line — upstream supports the two most recent majors. So
+# "latest" here means the current stable release, resolved at run time from
+# Go's own version endpoint.
+- name: Look up the current Go release
+  ansible.builtin.uri:
+    url: https://go.dev/VERSION?m=text
+    return_content: true
+  register: go_latest_raw
+  when: dev_tools_languages.go.version | string == 'latest'
+  changed_when: false
+
+- name: Record the target Go version
+  ansible.builtin.set_fact:
+    # The endpoint returns "go1.24.5" on the first line, then a timestamp.
+    go_target: >-
+      {{ (go_latest_raw.content.splitlines()[0] | trim | regex_replace('^go', ''))
+         if dev_tools_languages.go.version | string == 'latest'
+         else dev_tools_languages.go.version }}
+
+# A partial pin like "1.26" builds a URL that redirects to an HTML page, which
+# get_url would happily save as a .tar.gz — failing later in unarchive with an
+# opaque error, and retrying on every run because the version never matches.
+# Catch it here with a message that says what to do instead.
+- name: Require a fully-qualified Go version
+  ansible.builtin.assert:
+    # \Z rather than $: Python's $ also matches just before a trailing
+    # newline, so "1.26\n" would slip past the very check this exists for.
+    that: go_target is match('^[0-9]+\.[0-9]+\.[0-9]+\Z')
+    fail_msg: >-
+      dev_tools_languages.go.version must be "latest" or a full x.y.z version
+      (e.g. "1.23.4"); got "{{ go_target }}". Partial versions like "1.23" have
+      no download and will fail.
+
+- name: Check the installed Go version
+  ansible.builtin.command: "{{ go_install_dir }}/go/bin/go version"
+  register: go_current
+  failed_when: false
+  changed_when: false
+
+- name: Install Go {{ go_target }}
+  # `go version` prints "go version go1.24.5 linux/amd64". Anchoring the match
+  # with a trailing space stops go1.24.5 from satisfying a request for go1.24.
+  when: "'go' ~ go_target ~ ' ' not in (go_current.stdout | default(''))"
+  block:
+    # Unpacking an unverified tarball as root into /usr/local is worth avoiding;
+    # Go publishes a sha256 sidecar next to every archive, so use it.
+    - name: Fetch the Go tarball checksum
+      ansible.builtin.uri:
+        url: "https://dl.google.com/go/go{{ go_target }}.linux-{{ deb_arch }}.tar.gz.sha256"
+        return_content: true
+      register: go_sha256
+      changed_when: false
+
+    - name: Download the Go tarball
+      ansible.builtin.get_url:
+        url: "https://dl.google.com/go/go{{ go_target }}.linux-{{ deb_arch }}.tar.gz"
+        dest: "/tmp/go{{ go_target }}.linux-{{ deb_arch }}.tar.gz"
+        checksum: "sha256:{{ go_sha256.content | trim }}"
+        mode: "0644"
+
+    - name: Remove any previous Go installation
+      # Upstream requires deleting the old tree rather than unpacking over it:
+      # stale files from a previous version otherwise linger and break builds.
+      # Safe because the verified download above has already succeeded.
+      ansible.builtin.file:
+        path: "{{ go_install_dir }}/go"
+        state: absent
+      become: true
+
+    - name: Unpack Go
+      ansible.builtin.unarchive:
+        src: "/tmp/go{{ go_target }}.linux-{{ deb_arch }}.tar.gz"
+        dest: "{{ go_install_dir }}"
+        remote_src: true
+      become: true
+
+    # Tracking "latest" means a new ~80MB archive per Go release; without this
+    # they pile up in /tmp indefinitely.
+    - name: Remove the downloaded tarball
+      ansible.builtin.file:
+        path: "/tmp/go{{ go_target }}.linux-{{ deb_arch }}.tar.gz"
+        state: absent
+
+- name: Add Go to the shell environment
+  ansible.builtin.blockinfile:
+    path: "{{ target_home }}/.profile"
+    create: true
+    mode: "0644"
+    marker: "# {mark} ANSIBLE MANAGED: go"
+    block: |
+      export PATH="{{ go_install_dir }}/go/bin:$HOME/go/bin:$PATH"
+  become: false

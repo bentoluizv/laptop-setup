@@ -1,0 +1,109 @@
+---
+- name: Install prerequisites for managing apt repositories
+  ansible.builtin.apt:
+    name:
+      - software-properties-common
+      - gnupg
+      - apt-transport-https
+      - ca-certificates
+      # Required by ansible.builtin.debconf (see the preseed task below).
+      # Not present on a stock Ubuntu, so it has to be installed explicitly.
+      - debconf-utils
+    state: present
+    update_cache: true
+    cache_valid_time: "{{ apt_cache_valid_time }}"
+  become: true
+  when: (apt_ppas | length > 0) or (apt_external_repos | length > 0)
+
+# update_cache is deliberately false in both repo loops below. Leaving it on
+# rebuilds the entire apt cache once per repository — five full passes on a
+# first run with four vendor repos. The single "Update apt cache" task after
+# them does it once, and forces a refresh when any repo actually changed.
+- name: Add PPAs
+  ansible.builtin.apt_repository:
+    repo: "{{ item }}"
+    state: present
+    update_cache: false
+  become: true
+  loop: "{{ apt_ppas }}"
+  register: ppas_added
+
+# ---------------------------------------------------------------------------
+# Third-party apt repositories (vendors that ship their own, e.g. Chrome).
+# The implementation lives in external_repos.yml so the docker role can call
+# the same code instead of keeping a second copy of it.
+# ---------------------------------------------------------------------------
+- name: Set up third-party apt repositories
+  ansible.builtin.include_tasks: external_repos.yml
+  vars:
+    external_repos: "{{ apt_external_repos }}"
+  when: apt_external_repos | length > 0
+
+- name: Update apt cache
+  ansible.builtin.apt:
+    update_cache: true
+    # Normally honour the TTL, but bypass it when a PPA was just added,
+    # otherwise a cache younger than the TTL would be reused and the new
+    # repo's packages would not be installable in this same run. Vendor repos
+    # are handled inside external_repos.yml, which refreshes on its own.
+    cache_valid_time: >-
+      {{ 0 if (ppas_added.changed | default(false)) else apt_cache_valid_time }}
+  become: true
+  changed_when: false
+
+- name: Install base apt packages
+  ansible.builtin.apt:
+    name: "{{ apt_packages }}"
+    state: present
+  become: true
+  when: apt_packages | length > 0
+
+# Debian/Ubuntu install fd as `fdfind` to avoid a name clash with an older
+# package, so anything expecting `fd` (shell aliases, fzf integrations,
+# editor plugins) breaks out of the box. No root needed for a link in $HOME.
+- name: Link fdfind to fd
+  become: false
+  when:
+    - apt_link_fd | bool
+    - "'fd-find' in apt_packages"
+  block:
+    - name: Ensure ~/.local/bin exists
+      ansible.builtin.file:
+        path: "{{ target_home }}/.local/bin"
+        state: directory
+        mode: "0755"
+
+    - name: Check what currently occupies ~/.local/bin/fd
+      ansible.builtin.stat:
+        path: "{{ target_home }}/.local/bin/fd"
+      register: fd_path
+
+    - name: Create the fd symlink
+      ansible.builtin.file:
+        src: /usr/bin/fdfind
+        dest: "{{ target_home }}/.local/bin/fd"
+        state: link
+        force: true
+      # Only claim the name if it is free or already a symlink we manage. A
+      # real binary there is someone's deliberate install (`cargo install
+      # fd-find` puts one at exactly this path), and force would delete it.
+      when: not fd_path.stat.exists or fd_path.stat.islnk
+
+    - name: Report an unmanaged fd binary
+      ansible.builtin.debug:
+        msg: >-
+          {{ target_home }}/.local/bin/fd is a real file, not a symlink, so it
+          was left alone. Remove it, or set apt_link_fd: false to stop trying.
+      when: fd_path.stat.exists and not fd_path.stat.islnk
+
+- name: Upgrade all packages
+  ansible.builtin.apt:
+    upgrade: dist
+  become: true
+  when: apt_perform_upgrade | bool
+
+- name: Remove packages left behind by removed dependencies
+  ansible.builtin.apt:
+    autoremove: true
+  become: true
+  when: apt_perform_upgrade | bool

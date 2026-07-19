@@ -1,0 +1,28 @@
+---
+- name: Install base development packages
+  ansible.builtin.apt:
+    name: "{{ dev_tools_base_packages }}"
+    state: present
+    update_cache: true
+    cache_valid_time: "{{ apt_cache_valid_time }}"
+  become: true
+
+- name: Set up Python via uv
+  ansible.builtin.include_tasks: python.yml
+  when: dev_tools_languages.python.enabled | default(false) | bool
+  tags: [python]
+
+- name: Set up Node via nvm
+  ansible.builtin.include_tasks: node.yml
+  when: dev_tools_languages.node.enabled | default(false) | bool
+  tags: [node]
+
+- name: Set up Go
+  ansible.builtin.include_tasks: go.yml
+  when: dev_tools_languages.go.enabled | default(false) | bool
+  tags: [go]
+
+- name: Set up Rust via rustup
+  ansible.builtin.include_tasks: rust.yml
+  when: dev_tools_languages.rust.enabled | default(false) | bool
+  tags: [rust]

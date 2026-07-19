@@ -1,0 +1,64 @@
+---
+- name: Configure Ubuntu laptop
+  hosts: local
+  # No blanket become — each role escalates only on the tasks that need root.
+  become: false
+  gather_facts: true
+
+  pre_tasks:
+    - name: Verify we are on a supported distribution
+      ansible.builtin.assert:
+        that:
+          - ansible_facts['distribution'] in ['Ubuntu', 'Pop!_OS', 'Linux Mint']
+        fail_msg: >-
+          This playbook targets Ubuntu (and derivatives), but found
+          {{ ansible_facts['distribution'] }} {{ ansible_facts['distribution_version'] }}.
+      tags: [always]
+
+    - name: Warn when running as root outside ansible-pull
+      ansible.builtin.debug:
+        msg: >-
+          Running as root: target_user resolves to '{{ target_user }}'.
+          If that is not the account you want configured, pass
+          -e target_user=<name>.
+      when: ansible_facts['user_id'] == 'root'
+      tags: [always]
+
+  roles:
+    - role: apt-packages
+      tags: [apt, packages, base]
+
+    - role: dev-tools
+      tags: [dev, dev-tools]
+
+    - role: docker
+      tags: [docker]
+      when: docker_enabled | bool
+
+    - role: dotfiles
+      tags: [dotfiles]
+      when: dotfiles_enabled | bool
+
+    - role: snap-flatpak-apps
+      tags: [apps, snap, flatpak, gui]
+
+  post_tasks:
+    - name: Report group membership changes needing a re-login
+      ansible.builtin.debug:
+        msg: >-
+          '{{ target_user }}' was added to the docker group. Log out and back
+          in (or run `newgrp docker`) before using docker without sudo.
+      when: docker_group_changed | default(false)
+      tags: [always]
+
+    # Deliberately not automated: this adds a new root CA to the system trust
+    # store, which is a machine-wide security change and should be a conscious
+    # act, not a side effect of a setup run. It is also a one-time step.
+    - name: Remind about the one-time mkcert setup for DDEV
+      ansible.builtin.debug:
+        msg: >-
+          DDEV is installed. For https on local sites, run `mkcert -install`
+          once. It installs a local root CA into your system trust store —
+          review that before running it. `mkcert -uninstall` reverses it.
+      when: "'ddev' in apt_packages"
+      tags: [always]
