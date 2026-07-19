@@ -68,7 +68,7 @@ ansible-playbook -i inventory.ini playbook.yml -K -e rust_update=true
 
 ```bash
 sudo apt update && sudo apt install -y ansible git
-ansible-pull -U https://github.com/<you>/laptop-setup.git \
+ansible-pull -U https://github.com/bentoluizv/laptop-setup.git \
   -i inventory.ini playbook.yml --ask-become-pass
 ```
 
@@ -79,7 +79,7 @@ Running under `sudo` or as root requires naming the account to configure,
 otherwise dotfiles and language runtimes land in `/root`:
 
 ```bash
-sudo ansible-pull -U https://github.com/<you>/laptop-setup.git \
+sudo ansible-pull -U https://github.com/bentoluizv/laptop-setup.git \
   -i inventory.ini playbook.yml -e target_user=$USER
 ```
 
