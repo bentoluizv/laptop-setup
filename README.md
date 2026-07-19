@@ -3,6 +3,9 @@
 Ansible configuration for an Ubuntu laptop. Run it on a fresh machine, and
 rerun it any time — it is idempotent.
 
+To adopt it for your own machine or extend it, see
+[CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## Roles
 
 | Role | Installs | Tags |
