@@ -9,6 +9,17 @@
 target_user: "{{ ansible_facts['user_id'] }}"
 target_home: "/home/{{ target_user }}"
 
+# Ubuntu 25.10+ ships sudo-rs as the default `sudo`. It accepts -p but does not
+# use the prompt verbatim: it wraps Ansible's string inside its own template,
+# producing "[sudo: [sudo via ansible, key=...] password:] Password:". Ansible
+# never matches that, so every become task dies with "Timed out waiting for
+# become success or become password prompt".
+#
+# The classic sudo is still packaged, as /usr/bin/sudo.ws. Use it when present
+# and fall back to whatever `sudo` resolves to elsewhere, so this stays correct
+# on releases that never shipped sudo-rs.
+ansible_become_exe: "{{ '/usr/bin/sudo.ws' if '/usr/bin/sudo.ws' is exists else 'sudo' }}"
+
 # ---------------------------------------------------------------------------
 # apt-packages role
 # ---------------------------------------------------------------------------
@@ -72,10 +83,12 @@ apt_external_repos:
     repo: >-
       deb [arch=amd64 signed-by=/etc/apt/keyrings/google-chrome.asc]
       https://dl.google.com/linux/chrome/deb/ stable main
-    # The chrome .deb re-adds its own source file on every upgrade, which
-    # would fight the line above and report a change on each run. This writes
-    # /etc/default/google-chrome to switch that behaviour off.
-    disable_vendor_repo_add: true
+    # Chrome's postinst migrates our .list to this deb822 file and deletes the
+    # .list (see remove_legacy_list in its postinst). Once this exists Chrome
+    # owns the repo, so we stop recreating ours — otherwise every run reports
+    # a change and apt fetches the same packages twice. The line above only
+    # has to survive long enough to bootstrap the first install.
+    self_managed_marker: /etc/apt/sources.list.d/google-chrome.sources
 
   - name: github-cli
     key_url: https://cli.github.com/packages/githubcli-archive-keyring.gpg

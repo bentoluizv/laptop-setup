@@ -73,20 +73,47 @@
   loop_control:
     label: "{{ item.debconf.question }}"
 
+# Some vendors take over their own apt source once installed. Chrome is the
+# example: its postinst migrates /etc/apt/sources.list.d/google-chrome.list to
+# a deb822 .sources file and deletes the .list — including one we wrote. Left
+# alone, that means we recreate the .list every run (a permanent "changed") and
+# apt ends up fetching the same packages from two sources. So a repo may name a
+# `self_managed_marker`; once that file exists, the vendor owns the repo and we
+# stand down. Our entry exists only to bootstrap the very first install.
+- name: Check whether a vendor now manages its own source file
+  ansible.builtin.stat:
+    path: "{{ item.self_managed_marker | default('/nonexistent') }}"
+  loop: "{{ external_repos }}"
+  loop_control:
+    label: "{{ item.name }}"
+  register: vendor_managed
+
 # update_cache is false here: leaving it on rebuilds the whole apt cache once
 # per repository. The single refresh below does it once, and only when
 # something actually changed.
 - name: Add third-party repositories
   ansible.builtin.apt_repository:
-    repo: "{{ item.repo }}"
-    filename: "{{ item.name }}"
+    repo: "{{ item.item.repo }}"
+    filename: "{{ item.item.name }}"
     state: present
     update_cache: false
   become: true
-  loop: "{{ external_repos }}"
+  loop: "{{ vendor_managed.results }}"
   loop_control:
-    label: "{{ item.name }}"
+    label: "{{ item.item.name }}"
+  when: not item.stat.exists
   register: repos_added
+
+- name: Drop our bootstrap source file once the vendor manages its own
+  ansible.builtin.file:
+    path: "/etc/apt/sources.list.d/{{ item.item.name }}.list"
+    state: absent
+  become: true
+  loop: "{{ vendor_managed.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+  when: item.stat.exists
+  register: bootstrap_dropped
 
 - name: Refresh the apt cache after repository changes
   ansible.builtin.apt:
@@ -95,5 +122,5 @@
   # No cache_valid_time: a repo was just added, so a cache younger than the
   # TTL would be reused and the new repo's packages would not be installable
   # in this same run.
-  when: repos_added.changed
+  when: repos_added.changed or bootstrap_dropped.changed
   changed_when: false

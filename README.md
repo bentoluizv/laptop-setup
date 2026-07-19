@@ -44,6 +44,25 @@ ansible-playbook -i inventory.ini playbook.yml --ask-become-pass
 Escalation is per-task, not blanket — anything that writes inside `$HOME`
 (dotfiles, uv, nvm, rustup) runs as you.
 
+### If become times out on Ubuntu 25.10 or newer
+
+Ubuntu 25.10+ replaced the default `sudo` with `sudo-rs`, which renders
+Ansible's `-p` prompt inside its own template rather than using it verbatim.
+Ansible cannot match the resulting prompt and every privileged task fails with:
+
+```
+Timed out waiting for become success or become password prompt
+```
+
+`group_vars/all.yml` handles this by pointing `ansible_become_exe` at the
+classic sudo (`/usr/bin/sudo.ws`) when that binary exists, falling back to
+plain `sudo` otherwise. If you are on such a release and the classic binary is
+missing, install it with `sudo apt install sudo`. To check what you have:
+
+```bash
+readlink -f "$(which sudo)"    # /usr/lib/cargo/bin/sudo => sudo-rs
+```
+
 Useful variations:
 
 ```bash
