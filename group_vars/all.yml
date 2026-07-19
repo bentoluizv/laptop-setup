@@ -89,6 +89,9 @@ dev_tools_languages:
 npm_global_packages:
   - "@fission-ai/openspec@latest"
 
+npm_global_binaries:
+  - openspec
+
 uv_bin_dir: "{{ target_home }}/.local/bin"
 uv_self_update: false
 shell_rc_file: "{{ target_home }}/.bashrc"

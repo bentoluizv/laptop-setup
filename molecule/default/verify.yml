@@ -10,6 +10,13 @@
          + (dev_tools_languages.node.enabled | bool) | int
          + (dev_tools_languages.go.enabled | bool) | int
          + (dev_tools_languages.rust.enabled | bool) | int }}
+    expected_path_binaries: >-
+      {{ (['uv'] if dev_tools_languages.python.enabled | bool else [])
+         + (['node', 'npm'] if dev_tools_languages.node.enabled | bool else [])
+         + (['go'] if dev_tools_languages.go.enabled | bool else [])
+         + (['cargo', 'rustup'] if dev_tools_languages.rust.enabled | bool else [])
+         + verify_extra_binaries }}
+    verify_extra_binaries: "{{ npm_global_binaries | default([]) }}"
     expected_apt_binaries:
       - git
       - curl
@@ -78,6 +85,15 @@
         RUSTUP_HOME: "{{ rustup_home }}"
       register: rust_toolchain
       changed_when: false
+
+    - name: Confirm an interactive shell resolves every tool on PATH
+      ansible.builtin.shell:
+        cmd: 'bash -i -c "command -v {{ item }}" 2>/dev/null'
+        executable: /bin/bash
+      loop: "{{ expected_path_binaries }}"
+      register: path_lookup
+      changed_when: false
+      failed_when: path_lookup.rc != 0
 
     - name: Confirm the shell environment blocks were written exactly once
       ansible.builtin.shell:
