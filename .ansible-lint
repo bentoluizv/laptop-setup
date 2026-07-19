@@ -1,0 +1,13 @@
+---
+exclude_paths:
+  - .ansible_facts/
+  - collections/
+  - .github/
+
+skip_list:
+  - command-instead-of-shell
+  - risky-shell-pipe
+  - package-latest
+
+warn_list:
+  - experimental

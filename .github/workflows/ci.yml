@@ -1,0 +1,74 @@
+---
+name: CI
+
+"on":
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install linters
+        run: python -m pip install --upgrade ansible-lint yamllint
+
+      - name: yamllint
+        run: yamllint .
+
+      - name: ansible-lint
+        run: ansible-lint
+
+  molecule:
+    name: Converge and idempotence (container)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install molecule
+        run: |
+          python -m pip install --upgrade \
+            ansible-core molecule "molecule-plugins[docker]" docker
+
+      - name: molecule test
+        run: molecule test
+
+  full-run:
+    name: Full playbook on a real VM
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install ansible
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ansible
+          ansible-galaxy install -r requirements.yml
+
+      - name: First run
+        run: ansible-playbook -i inventory.ini playbook.yml
+
+      - name: Second run must report changed=0
+        run: |
+          set -o pipefail
+          ansible-playbook -i inventory.ini playbook.yml | tee /tmp/second.log
+          if ! grep -qE 'changed=0[[:space:]]+unreachable=0[[:space:]]+failed=0' /tmp/second.log; then
+            echo "::error::Playbook is not idempotent - the second run reported changes"
+            grep -E '^changed:|^TASK' /tmp/second.log | grep -B1 '^changed:' || true
+            exit 1
+          fi
+
+      - name: Verify the end state
+        run: ansible-playbook -i inventory.ini molecule/default/verify.yml

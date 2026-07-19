@@ -1,0 +1,108 @@
+---
+- name: Verify
+  hosts: all
+  gather_facts: true
+  become: false
+
+  vars:
+    expected_profile_blocks: >-
+      {{ (dev_tools_languages.python.enabled | bool) | int
+         + (dev_tools_languages.go.enabled | bool) | int
+         + (dev_tools_languages.rust.enabled | bool) | int }}
+    expected_apt_binaries:
+      - git
+      - curl
+      - wget
+      - rg
+      - fzf
+      - tree
+      - htop
+      - jq
+      - unzip
+      - vim
+      - tmux
+
+  tasks:
+    - name: Locate the apt-installed binaries
+      ansible.builtin.shell:
+        cmd: "command -v {{ item }}"
+        executable: /bin/bash
+      loop: "{{ expected_apt_binaries }}"
+      register: apt_binaries
+      changed_when: false
+
+    - name: Confirm fd is reachable under its shimmed name
+      ansible.builtin.stat:
+        path: "{{ target_home }}/.local/bin/fd"
+      register: fd_shim
+      failed_when: not fd_shim.stat.exists or not fd_shim.stat.islnk
+
+    - name: Confirm uv runs
+      ansible.builtin.command: "{{ uv_bin_dir }}/uv --version"
+      register: uv_version
+      changed_when: false
+
+    - name: Confirm no uv-managed interpreter was preinstalled
+      ansible.builtin.command: "{{ uv_bin_dir }}/uv python list --only-installed"
+      register: uv_pythons
+      changed_when: false
+      failed_when: >-
+        dev_tools_languages.python.versions | length == 0
+        and '/.local/share/uv/' in uv_pythons.stdout
+
+    - name: Confirm node matches the version the play resolved
+      ansible.builtin.shell:
+        cmd: '. "{{ nvm_dir }}/nvm.sh" && node --version'
+        executable: /bin/bash
+      register: node_version
+      changed_when: false
+
+    - name: Confirm the global npm CLIs are present
+      ansible.builtin.shell:
+        cmd: '. "{{ nvm_dir }}/nvm.sh" && npm ls -g --depth=0 --parseable'
+        executable: /bin/bash
+      register: npm_globals
+      changed_when: false
+      failed_when: false
+
+    - name: Confirm go runs and reports a full version
+      ansible.builtin.command: "{{ go_install_dir }}/go/bin/go version"
+      register: go_version
+      changed_when: false
+
+    - name: Confirm the rust toolchain is the configured channel
+      ansible.builtin.command: "{{ cargo_home }}/bin/rustup show active-toolchain"
+      environment:
+        CARGO_HOME: "{{ cargo_home }}"
+        RUSTUP_HOME: "{{ rustup_home }}"
+      register: rust_toolchain
+      changed_when: false
+
+    - name: Confirm the shell environment blocks were written exactly once
+      ansible.builtin.shell:
+        cmd: "grep -c 'BEGIN ANSIBLE MANAGED' {{ target_home }}/.profile"
+        executable: /bin/bash
+      register: profile_blocks
+      changed_when: false
+
+    - name: Assert the end state
+      ansible.builtin.assert:
+        that:
+          - "'uv ' in uv_version.stdout"
+          - node_version.stdout is match('^v[0-9]+\\.[0-9]+\\.[0-9]+$')
+          - go_version.stdout is search('go version go[0-9]+\\.[0-9]+\\.[0-9]+ ')
+          - dev_tools_languages.rust.channel in rust_toolchain.stdout
+          - profile_blocks.stdout | int == expected_profile_blocks
+          - >-
+            npm_global_packages | map('regex_replace', '(?<!^)@[^@]*$', '')
+            | reject('in', npm_globals.stdout) | list | length == 0
+        fail_msg: >-
+          uv={{ uv_version.stdout | default('') }}
+          node={{ node_version.stdout | default('') }}
+          go={{ go_version.stdout | default('') }}
+          rust={{ rust_toolchain.stdout | default('') }}
+          profile_blocks={{ profile_blocks.stdout | default('') }}
+        success_msg: >-
+          uv, node {{ node_version.stdout }}, {{ go_version.stdout.split(' ')[2] }},
+          rust {{ dev_tools_languages.rust.channel }}, and
+          {{ npm_global_packages | length }} npm CLI(s) all present.

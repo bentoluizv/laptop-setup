@@ -1,0 +1,42 @@
+---
+dependency:
+  name: galaxy
+  options:
+    requirements-file: requirements.yml
+
+driver:
+  name: docker
+
+platforms:
+  - name: laptop-setup-ubuntu
+    image: ubuntu:26.04
+    groups:
+      - local
+    command: /bin/sleep infinity
+    pre_build_image: false
+
+provisioner:
+  name: ansible
+  env:
+    ANSIBLE_ROLES_PATH: ../../roles
+    ANSIBLE_STDOUT_CALLBACK: default
+  inventory:
+    host_vars:
+      laptop-setup-ubuntu:
+        ansible_user: laptop
+        target_user: laptop
+  ansible_args:
+    - --skip-tags
+    - docker,apps
+
+scenario:
+  test_sequence:
+    - dependency
+    - destroy
+    - syntax
+    - create
+    - prepare
+    - converge
+    - idempotence
+    - verify
+    - destroy

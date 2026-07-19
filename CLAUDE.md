@@ -41,6 +41,25 @@ end state is correct. `--check` mode is not sufficient: tasks that inspect a
 tool an earlier task would have installed report failures on an unconfigured
 machine, and several bugs here only appeared on a real run.
 
+Molecule automates exactly that in a disposable container — its default
+sequence includes an `idempotence` step, then runs the assertions in
+`molecule/default/verify.yml`:
+
+```bash
+molecule test        # create, converge, idempotence, verify, destroy
+molecule converge    # leave the container up while iterating
+yamllint . && ansible-lint
+```
+
+The scenario skips `docker,apps`: Docker Engine and snapd both need systemd,
+which a plain container lacks. `.github/workflows/ci.yml` covers those in a
+`full-run` job on a real VM runner, which also re-runs the playbook and greps
+the recap for `changed=0`.
+
+`molecule/default/verify.yml` is a normal playbook and runs against any host,
+including this machine:
+`ansible-playbook -i inventory.ini molecule/default/verify.yml`.
+
 User-space tasks (uv, nvm, rustup, npm globals — anything under `$HOME`) can be
 exercised without sudo or touching the real home directory, because every
 derived path descends from `target_home`:

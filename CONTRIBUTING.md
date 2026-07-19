@@ -63,12 +63,16 @@ Then add it, and test as below.
 
 ## Testing a change
 
-Nothing is accepted without an idempotency check. Three levels, cheapest first.
+Nothing is accepted without an idempotency check. Four levels, cheapest first.
+CI runs all of them on every push and pull request.
 
-**1. Syntax and structure**
+**1. Syntax and lint**
 
 ```bash
 ansible-playbook -i inventory.ini playbook.yml --syntax-check
+pipx install ansible-lint yamllint    # or: sudo apt install ansible-lint yamllint
+yamllint .
+ansible-lint
 ```
 
 **2. Dry run**
@@ -91,9 +95,46 @@ The second run **must** report `changed=0`. A run that works once is not
 idempotent; a task that reports `changed` on every run is a bug, even when the
 end state is correct.
 
-**Testing user-space tasks without touching your machine.** Anything that
-installs under `$HOME` (uv, nvm, rustup, npm globals) can run against a
-throwaway home directory, because `target_home` drives every derived path:
+**4. Molecule — a disposable container, converged and checked automatically**
+
+```bash
+pip install molecule "molecule-plugins[docker]" docker
+molecule test
+```
+
+The default sequence creates an `ubuntu:26.04` container, converges the
+playbook, runs it a **second time and fails if anything reports `changed`**,
+then runs the assertions in `molecule/default/verify.yml`. Useful subcommands
+while iterating:
+
+```bash
+molecule converge     # create + run, leave the container up
+molecule idempotence  # re-run against the live container
+molecule verify       # assertions only
+molecule login        # shell into it
+molecule destroy
+```
+
+The scenario passes `--skip-tags docker,apps`, because Docker Engine and snapd
+both need systemd and neither works in a plain container. Those two roles are
+covered by the `full-run` CI job, which runs the whole playbook on a real VM
+runner.
+
+**Verifying the end state anywhere.** `molecule/default/verify.yml` is an
+ordinary playbook, so it also runs against your own machine:
+
+```bash
+ansible-playbook -i inventory.ini molecule/default/verify.yml
+```
+
+It asserts the tools exist, that node reports a real version, that go reports a
+fully-qualified one, that rust is on the configured channel, that the managed
+`~/.profile` blocks appear exactly once each, and that every entry in
+`npm_global_packages` is installed.
+
+**Testing user-space tasks without containers.** Anything that installs under
+`$HOME` (uv, nvm, rustup, npm globals) can run against a throwaway home
+directory, because `target_home` drives every derived path:
 
 ```yaml
 - hosts: local
