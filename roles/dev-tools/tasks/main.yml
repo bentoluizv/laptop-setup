@@ -7,6 +7,12 @@
     cache_valid_time: "{{ apt_cache_valid_time }}"
   become: true
 
+- name: Look for a legacy .profile
+  ansible.builtin.stat:
+    path: "{{ target_home }}/.profile"
+  register: legacy_profile
+  become: false
+
 - name: Remove shell blocks left in .profile by earlier runs
   ansible.builtin.blockinfile:
     path: "{{ target_home }}/.profile"
@@ -14,7 +20,9 @@
     state: absent
   loop: [uv, nvm, go, rust]
   become: false
-  when: shell_rc_file != target_home ~ '/.profile'
+  when:
+    - legacy_profile.stat.exists
+    - shell_rc_file != target_home ~ '/.profile'
 
 - name: Set up Python via uv
   ansible.builtin.include_tasks: python.yml
