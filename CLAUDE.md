@@ -75,9 +75,15 @@ derived path descends from `target_home`:
 
 ## Architecture
 
-Five roles in `playbook.yml`, in order: `apt-packages`, `dev-tools`, `docker`,
-`dotfiles`, `snap-flatpak-apps`. `docker` and `dotfiles` are gated on
-`docker_enabled` / `dotfiles_enabled`.
+Six roles in `playbook.yml`, in order: `apt-packages`, `dev-tools`, `docker`,
+`dotfiles`, `snap-flatpak-apps`, `security-updates`. `docker`, `dotfiles` and
+`security-updates` are gated on `docker_enabled` / `dotfiles_enabled` /
+`security_updates_enabled`.
+
+User-facing docs live in `docs/en/` and `docs/pt-BR/`, with a short index at
+the root `README.md`. **Both languages must be updated together** — a change to
+`docs/en/README.md` needs the matching edit in `docs/pt-BR/README.md`. This
+file stays at the root and in English.
 
 **Variables.** `group_vars/all.yml` is the single file a user edits. Each role
 mirrors the variables it reads into its own `defaults/main.yml` so it still
@@ -138,6 +144,17 @@ New commits must carry that reasoning, since nothing else records it.
 Prefer modules over `command`/`shell`. Where a shell call is unavoidable, make
 it idempotent with `creates:`, a `when:` on a prior check, or an accurate
 `changed_when:`. Every role gets a tag.
+
+**Commits follow [Conventional Commits 1.0.0](https://www.conventionalcommits.org/en/v1.0.0/)**
+— `<type>[scope][!]: <description>`, subject under 72 characters, blank line
+before the body. The `commit-msg` hook in `.githooks/` enforces the subject and
+`pre-commit` runs the lint CI runs; both are active once someone has run
+`git config core.hooksPath .githooks`, so a fresh clone may not have them.
+Messages are written in English regardless of doc language.
+
+Vendor apt keys carry a pinned `key_fingerprint` verified after download, and
+the uv/nvm installers are checksum-pinned in `group_vars/all.yml`. Changing a
+pinned version means updating its recorded `sha256` in the same commit.
 
 ## Pitfalls
 

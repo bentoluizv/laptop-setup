@@ -1,5 +1,7 @@
 # Contributing
 
+*[English](CONTRIBUTING.md) · [Português](../pt-BR/CONTRIBUTING.md)*
+
 How to adopt this repo for your own machine, extend it, and get changes in.
 
 ## Adopting it for yourself
@@ -23,9 +25,19 @@ role logic, idempotency bugs, new vendor-repo capabilities, documentation.
 ## Setting up to work on it
 
 ```bash
-sudo apt install -y ansible git
+sudo apt install -y ansible git ansible-lint yamllint
 ansible-galaxy install -r requirements.yml
+git config core.hooksPath .githooks
 ```
+
+That last line enables two hooks kept in [`.githooks/`](../../.githooks):
+
+- **pre-commit** runs yamllint, ansible-lint and a syntax check over staged
+  YAML — the same checks CI runs, before the commit exists. It skips a linter
+  that is not installed rather than failing.
+- **commit-msg** rejects a subject that does not follow Conventional Commits.
+
+Bypass either with `git commit --no-verify` when you need to.
 
 ## Adding a package
 
@@ -65,13 +77,13 @@ Then add it, and test as below.
 
 Nothing is accepted without an idempotency check. Four levels, cheapest first.
 
-[`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs all of them on every
+[`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) runs all of them on every
 push and pull request, in three jobs:
 
 | Job | Covers |
 | --- | --- |
 | `Lint` | yamllint + ansible-lint |
-| `Converge and idempotence (container)` | `molecule test` — everything except the `docker` and `apps` tags |
+| `Converge and idempotence (container)` | `molecule test` — everything except the `docker`, `apps` and `security` tags |
 | `Full playbook on a real VM` | the whole playbook twice on a runner, then the verify assertions |
 
 You do not need all of this locally. Level 1 and a twice-run on your own machine
@@ -86,13 +98,13 @@ yamllint .
 ansible-lint
 ```
 
-Lint config lives in [`.yamllint`](.yamllint) and
-[`.ansible-lint`](.ansible-lint). Four rules are skipped deliberately:
+Lint config lives in [`.yamllint`](../../.yamllint) and
+[`.ansible-lint`](../../.ansible-lint). Four rules are skipped deliberately:
 `role-name` (the role directories are hyphenated by project layout),
 `var-naming[no-role-prefix]` (`target_user`, `deb_arch` and friends are shared
 across roles on purpose), and `command-instead-of-module` /
-`risky-shell-pipe` (the uv, nvm and rustup installers are upstream scripts
-piped into a shell, which `get_url` cannot do).
+`risky-shell-pipe` (kept for shell calls that pipe, though the uv, nvm and
+rustup installers are now downloaded and checksum-verified rather than piped).
 
 **2. Dry run**
 
@@ -138,10 +150,10 @@ molecule login        # shell into it
 molecule destroy
 ```
 
-The scenario passes `--skip-tags docker,apps`, because Docker Engine and snapd
-both need systemd and neither works in a plain container. Those two roles are
-covered by the `full-run` CI job, which runs the whole playbook on a real VM
-runner.
+The scenario passes `--skip-tags docker,apps,security`, because Docker Engine,
+snapd and unattended-upgrades all need systemd and none work in a plain
+container. Those roles are covered by the `full-run` CI job, which runs the
+whole playbook on a real VM runner.
 
 **Verifying the end state anywhere.** `molecule/default/verify.yml` is an
 ordinary playbook, so it also runs against your own machine:
@@ -277,18 +289,46 @@ git rebase origin/main
 
 ### Commit messages
 
-Because the config carries no comments, commit messages are the only place the
-reasoning is recorded. Write them for someone debugging this in a year.
+This repo follows [Conventional Commits 1.0.0](https://www.conventionalcommits.org/en/v1.0.0/).
+The `commit-msg` hook enforces the subject; the body is on you.
 
-- Subject in the imperative, under ~72 characters: `Fix become on sudo-rs`,
-  not `fixed sudo stuff`.
-- Body explains **why**, and what breaks without the change. Name the concrete
-  failure, not just the edit.
-- State how it was verified — `changed=0` on a second run, versions confirmed,
+```
+<type>[optional scope][!]: <description>
+
+[optional body]
+
+[optional footer]
+```
+
+| Type | Use for |
+| --- | --- |
+| `feat` | A new capability — a role, an installed tool, a new option |
+| `fix` | A defect: wrong behaviour, a broken run, a non-idempotent task |
+| `docs` | Documentation only |
+| `test` | Molecule scenarios, verify assertions |
+| `ci` | Workflow and pipeline changes |
+| `refactor` | Restructuring with no behaviour change |
+| `style` | Formatting, line length, whitespace |
+| `chore` | Tooling, lint config, housekeeping |
+| `build` | Dependencies, `requirements.yml` |
+| `perf` | Making something measurably faster |
+| `revert` | Reverting an earlier commit |
+
+Scope is optional and names the affected area: `fix(molecule):`,
+`feat(docker):`, `docs(pt-br):`. A `!` before the colon marks a breaking
+change — for this repo, anything that alters an existing machine's state on
+rerun or removes a variable people set.
+
+Because the config carries no comments, the body is the only place the
+reasoning is recorded. Write it for someone debugging this in a year:
+
+- Explain **why**, and what breaks without the change. Name the concrete
+  failure, not the edit — the diff already shows the edit.
+- State how it was verified: `changed=0` on a second run, versions confirmed,
   whatever applies.
 
 ```
-Anchor the npm global installed-check
+fix: anchor the npm global installed-check
 
 A bare substring test matched "foo" against an installed "foobar", so the
 package was never installed while the play reported success. Anchor the
