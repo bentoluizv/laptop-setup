@@ -14,15 +14,13 @@ dev_tools_languages:
   go: {enabled: false, version: "latest"}
   rust: {enabled: false, channel: "stable"}
 
-rust_update: false
-
 npm_global_packages: []
 
 target_user: "{{ ansible_facts['user_id'] }}"
 target_home: "/home/{{ target_user }}"
-# Same amd64/arm64 mapping Go and apt both use; overridden by group_vars.
 deb_arch: "{{ 'amd64' if ansible_facts['architecture'] == 'x86_64' else 'arm64' }}"
 apt_cache_valid_time: 3600
+
 uv_bin_dir: "{{ target_home }}/.local/bin"
 uv_self_update: false
 nvm_dir: "{{ target_home }}/.nvm"
@@ -30,3 +28,4 @@ nvm_version: "v0.40.1"
 go_install_dir: "/usr/local"
 cargo_home: "{{ target_home }}/.cargo"
 rustup_home: "{{ target_home }}/.rustup"
+rust_update: false

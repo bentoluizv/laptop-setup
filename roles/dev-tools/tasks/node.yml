@@ -4,9 +4,6 @@
     path: "{{ nvm_dir }}/nvm.sh"
   register: nvm_script
 
-# The installer aborts with "You have $NVM_DIR set to ..., but that directory
-# does not exist" when NVM_DIR names a missing path — which is exactly the
-# case on a fresh machine. Create it first.
 - name: Ensure the nvm directory exists
   ansible.builtin.file:
     path: "{{ nvm_dir }}"
@@ -27,11 +24,6 @@
   when: not nvm_script.stat.exists
   become: false
 
-# ---------------------------------------------------------------------------
-# Resolve which Node version we actually want.
-#   "lts"  -> whatever the newest LTS line currently resolves to
-#   "22"   -> that major, pinned
-# ---------------------------------------------------------------------------
 - name: Look up the current LTS Node release
   ansible.builtin.shell:
     cmd: '. "{{ nvm_dir }}/nvm.sh" && nvm version-remote --lts'
@@ -55,19 +47,11 @@
          else dev_tools_languages.node.version }}
 
 - name: Check which Node versions are installed
-  # --no-alias is essential. Without it, `nvm ls` also prints the LTS alias
-  # table — "lts/krypton -> v24.18.0 (-> N/A)" — where "(-> N/A)" means the
-  # version is NOT installed. A plain substring test then matches the alias
-  # line, concludes Node is present, skips the install, and leaves a machine
-  # with no node and no npm. --no-alias lists only what is actually installed.
   ansible.builtin.shell:
     cmd: '. "{{ nvm_dir }}/nvm.sh" && nvm ls --no-colors --no-alias'
     executable: /bin/bash
   register: nvm_ls
   changed_when: false
-  # `nvm ls` exits 3 when no version is installed yet — the normal state on a
-  # fresh machine — while still printing usable output. Same reason `npm ls`
-  # below is tolerated: a non-zero rc here is information, not failure.
   failed_when: false
   become: false
 
@@ -78,29 +62,15 @@
       nvm install {{ node_install_spec }} &&
       nvm alias default '{{ node_default_alias }}'
     executable: /bin/bash
-  # Skipped once the resolved version is already present, so tracking LTS
-  # doesn't mean reinstalling on every run — only when a new LTS lands.
   when: node_target not in nvm_ls.stdout
   become: false
 
-# ---------------------------------------------------------------------------
-# Global npm CLIs. These live inside the nvm-managed Node, so they need nvm
-# sourced and they must never be installed with sudo.
-#
-# Globals are per-Node-version: when a new LTS lands, the fresh install starts
-# empty. The check below notices they're missing and reinstalls them, so the
-# listed packages survive an LTS bump. Anything you installed by hand outside
-# npm_global_packages will not — add it to that list if you want it kept.
-# ---------------------------------------------------------------------------
 - name: List globally installed npm packages
   ansible.builtin.shell:
     cmd: '. "{{ nvm_dir }}/nvm.sh" && npm ls -g --depth=0 --parseable'
     executable: /bin/bash
   register: npm_global_installed
   changed_when: false
-  # `npm ls` exits non-zero whenever any global package has an unmet or
-  # extraneous dependency. That is a warning about unrelated packages, not a
-  # reason to abort the run — we only care about the names it prints.
   failed_when: false
   when: npm_global_packages | length > 0
   become: false
@@ -110,8 +80,6 @@
     cmd: '. "{{ nvm_dir }}/nvm.sh" && npm install -g {{ item }}'
     executable: /bin/bash
   loop: "{{ npm_global_packages }}"
-  # Strip any @version suffix before matching, so pinning a version doesn't
-  # make this reinstall on every run. Scoped names keep their leading @.
   when: >-
     (item | regex_replace('(?<!^)@[^@]*$', ''))
     not in (npm_global_installed.stdout | default(''))

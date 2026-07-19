@@ -1,8 +1,4 @@
 ---
-# Every rustup call needs the same environment. Setting it only on the
-# installer would leave the later commands reading and writing the default
-# ~/.cargo and ~/.rustup, so a customised cargo_home would silently diverge
-# from where rustup actually keeps its state.
 - name: Check whether rustup is installed
   ansible.builtin.stat:
     path: "{{ cargo_home }}/bin/rustup"
@@ -37,8 +33,6 @@
   when: dev_tools_languages.rust.channel not in rust_toolchain.stdout
   become: false
 
-# `stable` is a moving channel, but rustup only advances it when told to.
-# Opt-in, like uv_self_update, so a plain rerun stays predictable.
 - name: Update the Rust toolchain
   ansible.builtin.command: "{{ cargo_home }}/bin/rustup update {{ dev_tools_languages.rust.channel }}"
   environment:

@@ -1,7 +1,6 @@
 ---
 - name: Configure Ubuntu laptop
   hosts: local
-  # No blanket become — each role escalates only on the tasks that need root.
   become: false
   gather_facts: true
 
@@ -51,9 +50,6 @@
       when: docker_group_changed | default(false)
       tags: [always]
 
-    # Deliberately not automated: this adds a new root CA to the system trust
-    # store, which is a machine-wide security change and should be a conscious
-    # act, not a side effect of a setup run. It is also a one-time step.
     - name: Remind about the one-time mkcert setup for DDEV
       ansible.builtin.debug:
         msg: >-

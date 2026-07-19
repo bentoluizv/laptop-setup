@@ -1,7 +1,7 @@
 ---
 snap_packages: []
-apt_cache_valid_time: 3600
 flatpak_enabled: false
 flatpak_packages: []
 flatpak_remote_name: flathub
 flatpak_remote_url: https://dl.flathub.org/repo/flathub.flatpakrepo
+apt_cache_valid_time: 3600

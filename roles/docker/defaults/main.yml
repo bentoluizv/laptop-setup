@@ -1,21 +1,18 @@
 ---
 docker_apt_codename: "{{ ansible_facts['distribution_release'] }}"
-docker_packages:
-  - docker-ce
-  - docker-ce-cli
-  - containerd.io
-  - docker-buildx-plugin
-  - docker-compose-plugin
 docker_add_user_to_group: true
 docker_daemon_options: {}
 target_user: "{{ ansible_facts['user_id'] }}"
 deb_arch: "{{ 'amd64' if ansible_facts['architecture'] == 'x86_64' else 'arm64' }}"
 apt_cache_valid_time: 3600
 
-# Consumed by apt-packages/tasks/external_repos.yml. The keyring path is
-# derived from `name`, so this lands at /etc/apt/keyrings/docker.asc —
-# download.docker.com serves an ASCII-armored key, hence the default
-# key_armored: true.
+docker_packages:
+  - docker-ce
+  - docker-ce-cli
+  - containerd.io
+  - docker-buildx-plugin
+  - docker-compose-plugin
+
 docker_external_repos:
   - name: docker
     key_url: https://download.docker.com/linux/ubuntu/gpg

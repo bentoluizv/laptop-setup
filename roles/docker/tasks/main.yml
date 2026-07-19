@@ -10,9 +10,6 @@
     cache_valid_time: "{{ apt_cache_valid_time }}"
   become: true
 
-# Keyring handling, key rotation and repo registration are shared with the
-# apt-packages role rather than reimplemented here. Duplicating them once cost
-# a key-rotation fix that had to be written twice; this keeps one copy.
 - name: Register Docker's apt repository
   ansible.builtin.include_role:
     name: apt-packages
