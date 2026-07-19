@@ -81,6 +81,10 @@
     - role: snap-flatpak-apps
       tags: [apps, snap, flatpak, gui]
 
+    - role: security-updates
+      tags: [security, updates]
+      when: security_updates_enabled | bool
+
   post_tasks:
     - name: Report group membership changes needing a re-login
       ansible.builtin.debug:

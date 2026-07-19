@@ -4,18 +4,37 @@
     path: "{{ cargo_home }}/bin/rustup"
   register: rustup_bin
 
+- name: Fetch the published rustup-init checksum
+  ansible.builtin.uri:
+    url: "{{ rustup_dist_url }}/{{ rustup_target }}/rustup-init.sha256"
+    return_content: true
+  register: rustup_init_sha
+  when: not rustup_bin.stat.exists
+  changed_when: false
+
+- name: Fetch rustup-init
+  ansible.builtin.get_url:
+    url: "{{ rustup_dist_url }}/{{ rustup_target }}/rustup-init"
+    dest: /tmp/rustup-init
+    checksum: "sha256:{{ rustup_init_sha.content.split()[0] }}"
+    mode: "0755"
+  when: not rustup_bin.stat.exists
+
 - name: Install rustup
-  ansible.builtin.shell:
-    cmd: >-
-      curl --proto '=https' --tlsv1.2 -fsSL https://sh.rustup.rs
-      | sh -s -- -y --no-modify-path
-      --default-toolchain {{ dev_tools_languages.rust.channel }}
+  ansible.builtin.command: >-
+    /tmp/rustup-init -y --no-modify-path
+    --default-toolchain {{ dev_tools_languages.rust.channel }}
   environment:
     CARGO_HOME: "{{ cargo_home }}"
     RUSTUP_HOME: "{{ rustup_home }}"
   when: not rustup_bin.stat.exists
   become: false
   changed_when: true
+
+- name: Remove rustup-init
+  ansible.builtin.file:
+    path: /tmp/rustup-init
+    state: absent
 
 - name: Check the active toolchain
   ansible.builtin.command: "{{ cargo_home }}/bin/rustup show active-toolchain"

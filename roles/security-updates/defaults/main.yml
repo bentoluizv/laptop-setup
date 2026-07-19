@@ -1,0 +1,5 @@
+---
+security_updates_enabled: true
+security_updates_download_only: false
+security_updates_autoclean_interval: 7
+security_updates_reboot: false

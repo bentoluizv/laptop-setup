@@ -1,6 +1,7 @@
 ---
 docker_apt_codename: "{{ ansible_facts['distribution_release'] }}"
 docker_add_user_to_group: true
+docker_rootless: false
 docker_daemon_options: {}
 target_user: "{{ ansible_facts['user_id'] }}"
 deb_arch: "{{ 'amd64' if ansible_facts['architecture'] == 'x86_64' else 'arm64' }}"
@@ -15,6 +16,7 @@ docker_packages:
 
 docker_external_repos:
   - name: docker
+    key_fingerprint: "9DC858229FC7DD38854AE2D88D81803C0EBFCD88"
     key_url: https://download.docker.com/linux/ubuntu/gpg
     repo: >-
       deb [arch={{ deb_arch }} signed-by=/etc/apt/keyrings/docker.asc]

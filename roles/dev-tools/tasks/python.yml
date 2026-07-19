@@ -4,15 +4,27 @@
     path: "{{ uv_bin_dir }}/uv"
   register: uv_bin
 
+- name: Fetch the pinned uv installer
+  ansible.builtin.get_url:
+    url: "https://astral.sh/uv/{{ uv_version }}/install.sh"
+    dest: /tmp/uv-installer.sh
+    checksum: "sha256:{{ uv_installer_sha256 }}"
+    mode: "0755"
+  when: not uv_bin.stat.exists
+
 - name: Install uv
-  ansible.builtin.shell:
-    cmd: "curl -LsSf https://astral.sh/uv/install.sh | sh"
+  ansible.builtin.command: /tmp/uv-installer.sh
   environment:
     UV_NO_MODIFY_PATH: "1"
     UV_INSTALL_DIR: "{{ uv_bin_dir }}"
   when: not uv_bin.stat.exists
   become: false
   changed_when: true
+
+- name: Remove the uv installer
+  ansible.builtin.file:
+    path: /tmp/uv-installer.sh
+    state: absent
 
 - name: Update uv in place
   ansible.builtin.command: "{{ uv_bin_dir }}/uv self update"

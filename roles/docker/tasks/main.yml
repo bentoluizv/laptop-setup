@@ -38,6 +38,44 @@
     state: started
     enabled: true
   become: true
+  when: not docker_rootless | bool
+
+- name: Set up rootless Docker
+  when: docker_rootless | bool
+  block:
+    - name: Install the rootless extras
+      ansible.builtin.apt:
+        name: docker-ce-rootless-extras
+        state: present
+      become: true
+
+    - name: Stop the system-wide docker daemon
+      ansible.builtin.systemd:
+        name: docker
+        state: stopped
+        enabled: false
+      become: true
+
+    - name: Check whether the rootless daemon is already configured
+      ansible.builtin.stat:
+        path: "{{ target_home }}/.config/systemd/user/docker.service"
+      register: rootless_unit
+
+    - name: Run the rootless setup tool
+      ansible.builtin.command: /usr/bin/dockerd-rootless-setuptool.sh install
+      become: false
+      when: not rootless_unit.stat.exists
+      changed_when: true
+
+    - name: Point the client at the rootless socket
+      ansible.builtin.blockinfile:
+        path: "{{ target_home }}/.profile"
+        create: true
+        mode: "0644"
+        marker: "# {mark} ANSIBLE MANAGED: docker-rootless"
+        block: |
+          export DOCKER_HOST="unix:///run/user/$(id -u)/docker.sock"
+      become: false
 
 - name: "Add the target account to the docker group: {{ target_user }}"
   ansible.builtin.user:
@@ -45,7 +83,9 @@
     groups: docker
     append: true
   become: true
-  when: docker_add_user_to_group | bool
+  when:
+    - docker_add_user_to_group | bool
+    - not docker_rootless | bool
   register: docker_group_result
 
 - name: Flag that a re-login is needed

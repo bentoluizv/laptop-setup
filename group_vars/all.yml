@@ -31,6 +31,7 @@ deb_arch: "{{ 'amd64' if ansible_facts['architecture'] == 'x86_64' else 'arm64' 
 
 apt_external_repos:
   - name: google-chrome
+    key_fingerprint: "EB4C1BFD4F042F6DDDCCEC917721F63BD38B4796"
     key_url: https://dl.google.com/linux/linux_signing_key.pub
     repo: >-
       deb [arch=amd64 signed-by=/etc/apt/keyrings/google-chrome.asc]
@@ -38,6 +39,7 @@ apt_external_repos:
     self_managed_marker: /etc/apt/sources.list.d/google-chrome.sources
 
   - name: github-cli
+    key_fingerprint: "2C6106201985B60E6C7AC87323F3D4EA75716059"
     key_url: https://cli.github.com/packages/githubcli-archive-keyring.gpg
     key_armored: false
     repo: >-
@@ -45,12 +47,14 @@ apt_external_repos:
       https://cli.github.com/packages stable main
 
   - name: ddev
+    key_fingerprint: "DBD730A3A581BDAC98BAF17FC16711FC1179C7CA"
     key_url: https://pkg.ddev.com/apt/gpg.key
     repo: >-
       deb [signed-by=/etc/apt/keyrings/ddev.asc]
       https://pkg.ddev.com/apt/ * *
 
   - name: vscode
+    key_fingerprint: "BC528686B50D79E339D3721CEB3E94ADBE1229CF"
     key_url: https://packages.microsoft.com/keys/microsoft.asc
     repo: >-
       deb [arch={{ deb_arch }} signed-by=/etc/apt/keyrings/vscode.asc]
@@ -89,12 +93,18 @@ uv_bin_dir: "{{ target_home }}/.local/bin"
 uv_self_update: false
 nvm_dir: "{{ target_home }}/.nvm"
 nvm_version: "v0.40.1"
+uv_version: "0.11.29"
+uv_installer_sha256: "504a79fd2ed0dcd47e7f04f0792cfd0871f62e24a7fe40fa8ae0f563a369f2bd"
+nvm_installer_sha256: "abdb525ee9f5b48b34d8ed9fc67c6013fb0f659712e401ecd88ab989b3af8f53"
+rustup_dist_url: "https://static.rust-lang.org/rustup/dist"
+rustup_target: "{{ 'x86_64-unknown-linux-gnu' if ansible_facts['architecture'] == 'x86_64' else 'aarch64-unknown-linux-gnu' }}"
 go_install_dir: "/usr/local"
 cargo_home: "{{ target_home }}/.cargo"
 rustup_home: "{{ target_home }}/.rustup"
 rust_update: false
 
 docker_enabled: true
+docker_rootless: false
 docker_apt_codename: "{{ ansible_facts['distribution_release'] }}"
 docker_add_user_to_group: true
 docker_daemon_options: {}
@@ -122,3 +132,7 @@ flatpak_enabled: false
 flatpak_remote_name: flathub
 flatpak_remote_url: https://dl.flathub.org/repo/flathub.flatpakrepo
 flatpak_packages: []
+
+security_updates_enabled: true
+security_updates_download_only: false
+security_updates_reboot: false

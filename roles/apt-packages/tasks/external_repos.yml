@@ -17,6 +17,35 @@
   loop_control:
     label: "{{ item.name }}"
 
+- name: Read the fingerprint of each fetched signing key
+  ansible.builtin.shell:
+    cmd: >-
+      set -o pipefail;
+      gpg --show-keys --with-colons
+      "/etc/apt/keyrings/{{ item.name }}.{{ 'asc' if item.key_armored | default(true) else 'gpg' }}"
+      | awk -F: '/^fpr:/ {print $10; exit}'
+    executable: /bin/bash
+  loop: "{{ external_repos }}"
+  loop_control:
+    label: "{{ item.name }}"
+  register: key_fingerprints
+  changed_when: false
+
+- name: Verify each signing key matches its pinned fingerprint
+  ansible.builtin.assert:
+    that: (item.stdout | trim) == item.item.key_fingerprint
+    fail_msg: >-
+      The signing key served for {{ item.item.name }} does not match the
+      fingerprint pinned in this repository.
+      Expected {{ item.item.key_fingerprint }},
+      got {{ item.stdout | trim | default('nothing') }}.
+      Refusing to register the repository.
+    success_msg: "{{ item.item.name }} key matches its pinned fingerprint"
+  loop: "{{ key_fingerprints.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+  when: item.item.key_fingerprint is defined
+
 - name: Preseed debconf answers for vendor packages
   ansible.builtin.debconf:
     name: "{{ item.debconf.name }}"

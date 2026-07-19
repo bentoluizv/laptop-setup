@@ -29,7 +29,7 @@ provisioner:
         target_user: laptop
   ansible_args:
     - --skip-tags
-    - docker,apps
+    - docker,apps,security
 
 scenario:
   test_sequence:
