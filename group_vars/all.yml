@@ -1,7 +1,7 @@
 ---
 target_user: "{{ ansible_facts['user_id'] }}"
 target_home: "/home/{{ target_user }}"
-ansible_become_exe: "{{ '/usr/bin/sudo.ws' if '/usr/bin/sudo.ws' is exists else 'sudo' }}"
+classic_sudo_path: /usr/bin/sudo.ws
 
 apt_cache_valid_time: 3600
 apt_perform_upgrade: false

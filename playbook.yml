@@ -24,6 +24,17 @@
           arm64 artifacts and write arch=arm64 apt lines for this machine.
       tags: [always]
 
+    - name: Look for the classic sudo binary on the target
+      ansible.builtin.stat:
+        path: "{{ classic_sudo_path }}"
+      register: classic_sudo
+      tags: [always]
+
+    - name: Use the classic sudo when the target has it
+      ansible.builtin.set_fact:
+        ansible_become_exe: "{{ classic_sudo_path if classic_sudo.stat.exists else 'sudo' }}"
+      tags: [always]
+
     - name: Resolve which sudo implementation is active
       ansible.builtin.command: readlink -f /usr/bin/sudo
       register: sudo_impl

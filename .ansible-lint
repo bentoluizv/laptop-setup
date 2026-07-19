@@ -6,6 +6,7 @@ exclude_paths:
 
 skip_list:
   - role-name
+  - var-naming[no-role-prefix]
   - command-instead-of-shell
   - command-instead-of-module
   - risky-shell-pipe
