@@ -51,8 +51,9 @@ molecule converge    # leave the container up while iterating
 yamllint . && ansible-lint
 ```
 
-The scenario skips `docker,apps`: Docker Engine and snapd both need systemd,
-which a plain container lacks. `.github/workflows/ci.yml` covers those in a
+The scenario skips `docker,apps,security`: Docker Engine, snapd and
+`unattended-upgrades` all need systemd, which a plain container lacks.
+`.github/workflows/ci.yml` covers those in a
 `full-run` job on a real VM runner, which also re-runs the playbook and greps
 the recap for `changed=0`.
 
@@ -152,13 +153,22 @@ before the body. The `commit-msg` hook in `.githooks/` enforces the subject and
 `git config core.hooksPath .githooks`, so a fresh clone may not have them.
 Messages are written in English regardless of doc language.
 
+**Open questions are settled before the work is published, never inside it.** A
+commit body or pull request description states decisions and their rationale.
+It is not the place to ask "should I also…?" or "say the word if you'd rather…".
+Both are read asynchronously and merged past, so a question parked there either
+blocks review on the author or lets the decision default silently. Raise the
+doubt while the work is still in progress, get an answer, then write that answer
+in as a decision.
+
 Vendor apt keys carry a pinned `key_fingerprint` verified after download, and
 the uv/nvm installers are checksum-pinned in `group_vars/all.yml`. Changing a
 pinned version means updating its recorded `sha256` in the same commit.
 
 ## Pitfalls
 
-These have each produced a run that reported success while installing nothing.
+These have each produced a run that reported success while installing nothing,
+or a commit that recorded a reason which was not true.
 
 **Substring tests in `when:`.** `'foo' in output` matches an installed
 `foobar`; `'v2'` matches `v22.18.0`. Anchor with `regex_escape` and `search`,
@@ -182,3 +192,13 @@ trailing newline).
 **Verify a package provides what you assume before adding it.** Read `snap
 info`'s channel map rather than its description — `aws-cli`'s `latest/stable`
 tracks v1, so the entry pins `v2/stable`.
+
+**A vendor's prose is not the state of the machine.** Install docs describe the
+happy path on a clean system, not what a real one looks like after someone
+followed them by hand. The Claude desktop docs describe an apt entry the package
+writes and leaves commented out; on this machine that file is live and owned by
+no package at all. Both facts went into a commit message as justification before
+either was checked, and `dpkg-query -W -f='${Conffiles}'` plus `dpkg -S`
+disproved them in seconds. Read the machine before writing the rationale — and
+when a claim about packaging behaviour is load-bearing for a design decision,
+it belongs in the commit message only once a command has confirmed it.
