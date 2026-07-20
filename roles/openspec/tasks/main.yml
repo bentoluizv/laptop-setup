@@ -1,0 +1,40 @@
+---
+- name: Check whether openspec is installed
+  ansible.builtin.shell:
+    cmd: '. "{{ nvm_dir }}/nvm.sh" && command -v openspec'
+    executable: /bin/bash
+  register: openspec_bin
+  changed_when: false
+  failed_when: false
+  become: false
+
+- name: Initialize openspec for the user
+  when: openspec_bin.rc == 0
+  become: false
+  block:
+    - name: Check whether the global openspec config exists
+      ansible.builtin.stat:
+        path: "{{ target_home }}/.config/openspec/config.json"
+      register: openspec_config
+
+    - name: Seed the global openspec config with profile {{ openspec_profile }}
+      ansible.builtin.shell:
+        cmd: '. "{{ nvm_dir }}/nvm.sh" && openspec config set profile {{ openspec_profile }}'
+        executable: /bin/bash
+      when: not openspec_config.stat.exists
+      changed_when: true
+
+    - name: Read the user's login shell
+      ansible.builtin.getent:
+        database: passwd
+        key: "{{ target_user }}"
+
+    - name: Install openspec shell completion for the user's login shell
+      ansible.builtin.shell:
+        cmd: '. "{{ nvm_dir }}/nvm.sh" && openspec completion install {{ openspec_login_shell }}'
+        executable: /bin/bash
+      vars:
+        openspec_login_shell: "{{ getent_passwd[target_user][5] | basename }}"
+      when: openspec_login_shell in ['bash', 'zsh']
+      register: openspec_completion
+      changed_when: "'already installed' not in (openspec_completion.stdout | default(''))"

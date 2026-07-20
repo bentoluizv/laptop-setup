@@ -14,6 +14,7 @@ To adopt it for your own machine or extend it, see
 | --- | --- | --- |
 | `apt-packages` | CLI tools, PPAs, vendor apt repos | `apt`, `packages`, `base` |
 | `dev-tools` | build-essential, git, language runtimes, global npm CLIs | `dev`, `dev-tools` |
+| `openspec` | Seeds openspec's global config and shell completion | `openspec`, `dev-tools` |
 | `docker` | Docker Engine + compose plugin | `docker` |
 | `dotfiles` | Clones a dotfiles repo and symlinks it into `$HOME` | `dotfiles` |
 | `snap-flatpak-apps` | GUI apps via snap and flatpak | `apps`, `snap`, `flatpak`, `gui` |

@@ -14,6 +14,7 @@ Para adaptar a sua própria máquina ou estender o projeto, veja
 | --- | --- | --- |
 | `apt-packages` | Ferramentas de linha de comando, PPAs, repositórios apt de terceiros | `apt`, `packages`, `base` |
 | `dev-tools` | build-essential, git, runtimes de linguagem, CLIs npm globais | `dev`, `dev-tools` |
+| `openspec` | Semeia a configuração global e o autocompletar do openspec | `openspec`, `dev-tools` |
 | `docker` | Docker Engine + plugin compose | `docker` |
 | `dotfiles` | Clona um repositório de dotfiles e cria os links simbólicos no `$HOME` | `dotfiles` |
 | `snap-flatpak-apps` | Aplicativos gráficos via snap e flatpak | `apps`, `snap`, `flatpak`, `gui` |
