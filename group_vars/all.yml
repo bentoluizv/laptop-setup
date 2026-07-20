@@ -88,9 +88,11 @@ dev_tools_languages:
 
 npm_global_packages:
   - "@fission-ai/openspec@latest"
+  - "@anthropic-ai/claude-code@latest"
 
 npm_global_binaries:
   - openspec
+  - claude
 
 uv_bin_dir: "{{ target_home }}/.local/bin"
 uv_self_update: false
