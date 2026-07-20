@@ -23,6 +23,7 @@ deb_arch: "{{ 'amd64' if ansible_facts['architecture'] == 'x86_64' else 'arm64' 
 apt_cache_valid_time: 3600
 
 uv_bin_dir: "{{ target_home }}/.local/bin"
+uv_tools: []
 uv_self_update: false
 session_env_enabled: true
 session_env_file: "{{ target_home }}/.config/environment.d/10-laptop-setup.conf"
