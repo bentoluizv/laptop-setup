@@ -33,6 +33,24 @@
   when: uv_self_update | bool
   become: false
 
+- name: List the uv-managed tools already installed
+  ansible.builtin.command: "{{ uv_bin_dir }}/uv tool list"
+  register: uv_tools_installed
+  changed_when: false
+  when: uv_tools | length > 0
+  become: false
+
+- name: Install uv-managed CLI tools
+  ansible.builtin.command: "{{ uv_bin_dir }}/uv tool install {{ item }}"
+  environment:
+    UV_TOOL_BIN_DIR: "{{ uv_bin_dir }}"
+  loop: "{{ uv_tools }}"
+  when: >-
+    not ((uv_tools_installed.stdout | default('')) is search(
+      '(?m)^' ~ (item | regex_escape) ~ '\s'))
+  become: false
+  changed_when: true
+
 - name: Check which Python versions uv already has
   ansible.builtin.command: "{{ uv_bin_dir }}/uv python list --only-installed"
   register: uv_python_installed

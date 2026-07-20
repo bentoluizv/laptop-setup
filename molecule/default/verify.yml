@@ -12,7 +12,7 @@
          + (dev_tools_languages.go.enabled | bool) | int
          + (dev_tools_languages.rust.enabled | bool) | int }}
     expected_path_binaries: >-
-      {{ (['uv'] if dev_tools_languages.python.enabled | bool else [])
+      {{ ((['uv'] + (uv_tools | default([]))) if dev_tools_languages.python.enabled | bool else [])
          + (['node', 'npm'] if dev_tools_languages.node.enabled | bool else [])
          + (['go'] if dev_tools_languages.go.enabled | bool else [])
          + (['cargo', 'rustup'] if dev_tools_languages.rust.enabled | bool else [])

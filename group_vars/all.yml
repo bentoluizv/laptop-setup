@@ -98,6 +98,9 @@ openspec_enabled: true
 openspec_profile: core
 
 uv_bin_dir: "{{ target_home }}/.local/bin"
+uv_tools:
+  - ansible-lint
+  - yamllint
 uv_self_update: false
 session_env_enabled: true
 session_env_file: "{{ target_home }}/.config/environment.d/10-laptop-setup.conf"

@@ -136,6 +136,10 @@ because it changes a working DDEV setup and is not exercised in CI.
 **Global npm CLI** — append to `npm_global_packages`. Pin with `@x.y.z`, or use
 `@latest`.
 
+**Python CLI tool** — append the PyPI name to `uv_tools`; uv installs it as a
+standalone tool on `PATH`. `ansible-lint` and `yamllint` ship by default so the
+`.githooks` lint runs locally, matching CI.
+
 **Language runtime** — set `enabled: true` under the relevant key in
 `dev_tools_languages`.
 

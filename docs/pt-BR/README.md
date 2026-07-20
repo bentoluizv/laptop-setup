@@ -142,6 +142,10 @@ altera um DDEV que já funciona e não é exercitado no CI.
 **CLI npm global** — acrescente em `npm_global_packages`. Fixe com `@x.y.z` ou
 use `@latest`.
 
+**Ferramenta CLI de Python** — acrescente o nome no PyPI em `uv_tools`; o uv a
+instala como ferramenta isolada no `PATH`. `ansible-lint` e `yamllint` já vêm por
+padrão para que o lint dos `.githooks` rode localmente, igual ao CI.
+
 **Runtime de linguagem** — defina `enabled: true` na chave correspondente em
 `dev_tools_languages`.
 
