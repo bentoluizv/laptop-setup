@@ -66,12 +66,12 @@
 
 - name: Add cargo to the shell environment
   ansible.builtin.blockinfile:
-    path: "{{ shell_rc_file }}"
+    path: "{{ shell_env_file }}"
     create: true
     mode: "0644"
     marker: "# {mark} ANSIBLE MANAGED: rust"
     block: |
       export CARGO_HOME="{{ cargo_home }}"
       export RUSTUP_HOME="{{ rustup_home }}"
-      export PATH="$CARGO_HOME/bin:$PATH"
+      _laptop_setup_path_prepend "$CARGO_HOME/bin"
   become: false

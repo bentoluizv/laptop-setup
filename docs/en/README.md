@@ -201,11 +201,20 @@ Use an `https://` URL so it works under `ansible-pull` before any SSH key
 exists. A real file already at a link target is moved to
 `<name>.bak.<timestamp>` first.
 
-Leave `~/.bashrc` out of the repo: the playbook writes managed blocks into it
-for uv, nvm, Go and cargo. The target is `shell_rc_file` — point it at
-`.zshrc` if you use zsh. It has to be a file your **interactive** shell reads:
-`~/.profile` is only read by login shells, so tools installed there are
-missing from a normal terminal tab.
+Leave your shell rc files out of the repo. The playbook writes every tool's
+setup into a single `~/.config/laptop-setup/env.sh` (`shell_env_file`) and adds
+a one-line hook to each rc file in `shell_rc_files` that exists — `.bashrc`,
+`.zshrc`, `.profile` by default. So the shell you use does not matter, and a
+zsh user needs no configuration change.
+
+PATH entries go through a helper that only prepends when the entry is absent,
+so sourcing the file twice — which happens, since `.profile` sources `.bashrc`
+— cannot duplicate them.
+
+One limit: a plain non-interactive `bash -c` reads no rc file at all, by
+design, so it will not see these tools. That affects scripts and some
+editor-integrated terminals. `~/.config/environment.d/` is the shell-agnostic
+answer there if you need it.
 
 If your repo has its own install script, set `dotfiles_install_script` to its
 path relative to the repo root and it runs after cloning, instead of using

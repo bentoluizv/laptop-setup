@@ -7,22 +7,30 @@
     cache_valid_time: "{{ apt_cache_valid_time }}"
   become: true
 
-- name: Look for a legacy .profile
-  ansible.builtin.stat:
-    path: "{{ target_home }}/.profile"
-  register: legacy_profile
+- name: Create the directory holding the shared shell environment
+  ansible.builtin.file:
+    path: "{{ shell_env_file | dirname }}"
+    state: directory
+    mode: "0755"
   become: false
 
-- name: Remove shell blocks left in .profile by earlier runs
+- name: Write the path helper the language blocks build on
   ansible.builtin.blockinfile:
-    path: "{{ target_home }}/.profile"
-    marker: "# {mark} ANSIBLE MANAGED: {{ item }}"
-    state: absent
-  loop: [uv, nvm, go, rust]
+    path: "{{ shell_env_file }}"
+    create: true
+    mode: "0644"
+    insertbefore: BOF
+    marker: "# {mark} ANSIBLE MANAGED: helper"
+    block: |
+      # Prepend to PATH only when absent, so sourcing this file more than once
+      # cannot duplicate entries.
+      _laptop_setup_path_prepend() {
+          case ":$PATH:" in
+              *":$1:"*) ;;
+              *) PATH="$1:$PATH" ;;
+          esac
+      }
   become: false
-  when:
-    - legacy_profile.stat.exists
-    - shell_rc_file != target_home ~ '/.profile'
 
 - name: Set up Python via uv
   ansible.builtin.include_tasks: python.yml
@@ -43,3 +51,34 @@
   ansible.builtin.include_tasks: rust.yml
   when: dev_tools_languages.rust.enabled | default(false) | bool
   tags: [rust]
+
+- name: Find which shell rc files exist
+  ansible.builtin.stat:
+    path: "{{ target_home }}/{{ item }}"
+  loop: "{{ shell_rc_files }}"
+  register: shell_rc_stat
+  become: false
+
+- name: Source the shared environment from every shell rc file present
+  ansible.builtin.blockinfile:
+    path: "{{ target_home }}/{{ item.item }}"
+    marker: "# {mark} ANSIBLE MANAGED: laptop-setup"
+    block: |
+      [ -f "{{ shell_env_file }}" ] && . "{{ shell_env_file }}"
+  loop: "{{ shell_rc_stat.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+  when: item.stat.exists
+  become: false
+
+- name: Remove per-tool blocks written by earlier versions
+  ansible.builtin.blockinfile:
+    path: "{{ target_home }}/{{ item.0 }}"
+    marker: "# {mark} ANSIBLE MANAGED: {{ item.1 }}"
+    state: absent
+  loop: "{{ present_rc | product(['uv', 'nvm', 'go', 'rust']) | list }}"
+  loop_control:
+    label: "{{ item.0 }} / {{ item.1 }}"
+  vars:
+    present_rc: "{{ shell_rc_stat.results | selectattr('stat.exists') | map(attribute='item') | list }}"
+  become: false

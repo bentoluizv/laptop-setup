@@ -65,10 +65,10 @@
 
 - name: Add uv to the shell environment
   ansible.builtin.blockinfile:
-    path: "{{ shell_rc_file }}"
+    path: "{{ shell_env_file }}"
     create: true
     mode: "0644"
     marker: "# {mark} ANSIBLE MANAGED: uv"
     block: |
-      export PATH="{{ uv_bin_dir }}:$PATH"
+      _laptop_setup_path_prepend "{{ uv_bin_dir }}"
   become: false

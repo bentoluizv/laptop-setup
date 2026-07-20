@@ -31,7 +31,7 @@
 
 - name: Add nvm to the shell environment
   ansible.builtin.blockinfile:
-    path: "{{ shell_rc_file }}"
+    path: "{{ shell_env_file }}"
     create: true
     mode: "0644"
     marker: "# {mark} ANSIBLE MANAGED: nvm"

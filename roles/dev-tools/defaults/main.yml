@@ -24,7 +24,11 @@ apt_cache_valid_time: 3600
 
 uv_bin_dir: "{{ target_home }}/.local/bin"
 uv_self_update: false
-shell_rc_file: "{{ target_home }}/.bashrc"
+shell_env_file: "{{ target_home }}/.config/laptop-setup/env.sh"
+shell_rc_files:
+  - .bashrc
+  - .zshrc
+  - .profile
 nvm_dir: "{{ target_home }}/.nvm"
 nvm_version: "v0.40.1"
 uv_version: "0.11.29"

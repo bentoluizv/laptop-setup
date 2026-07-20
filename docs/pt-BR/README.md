@@ -209,11 +209,21 @@ Use uma URL `https://` para funcionar com `ansible-pull` antes de existir
 qualquer chave SSH. Um arquivo real que já esteja no destino do link é movido
 antes para `<nome>.bak.<timestamp>`.
 
-Deixe o `~/.bashrc` fora do repositório: o playbook escreve blocos gerenciados
-nele para uv, nvm, Go e cargo. O destino é o `shell_rc_file` — aponte para o
-`.zshrc` se você usa zsh. Precisa ser um arquivo que o seu shell **interativo**
-leia: o `~/.profile` só é lido por shells de login, então ferramentas
-instaladas ali somem em uma aba normal do terminal.
+Deixe os arquivos de configuração do seu shell fora do repositório. O playbook
+escreve a configuração de todas as ferramentas em um único
+`~/.config/laptop-setup/env.sh` (`shell_env_file`) e adiciona uma linha de
+carregamento em cada arquivo listado em `shell_rc_files` que existir — por
+padrão `.bashrc`, `.zshrc` e `.profile`. Assim o shell que você usa não
+importa, e quem usa zsh não precisa mudar nada.
+
+As entradas de PATH passam por uma função auxiliar que só acrescenta quando o
+caminho ainda não está lá, então carregar o arquivo duas vezes — o que
+acontece, já que o `.profile` carrega o `.bashrc` — não duplica nada.
+
+Uma limitação: um `bash -c` não interativo não lê nenhum arquivo de
+configuração, por definição, e portanto não enxerga essas ferramentas. Isso
+afeta scripts e alguns terminais integrados de editor. O
+`~/.config/environment.d/` é a resposta independente de shell nesse caso.
 
 Se o seu repositório tiver um script de instalação próprio, defina
 `dotfiles_install_script` com o caminho relativo à raiz dele; o script roda
