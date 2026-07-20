@@ -211,10 +211,16 @@ PATH entries go through a helper that only prepends when the entry is absent,
 so sourcing the file twice — which happens, since `.profile` sources `.bashrc`
 — cannot duplicate them.
 
-One limit: a plain non-interactive `bash -c` reads no rc file at all, by
-design, so it will not see these tools. That affects scripts and some
-editor-integrated terminals. `~/.config/environment.d/` is the shell-agnostic
-answer there if you need it.
+Shell rc files only cover shells. Scripts, editor-integrated terminals and
+coding agents run non-interactive shells, which read no rc file at all — by
+design. So the playbook also writes
+`~/.config/environment.d/10-laptop-setup.conf` (`session_env_file`), which
+systemd applies to the entire user session. Every process started after that
+inherits the tool paths, whatever shell it uses or does not use.
+
+**It takes effect at the next login.** Until you log out and back in, agents
+and scripts will still report the tools as missing even though your terminal
+finds them. Set `session_env_enabled: false` to skip this.
 
 If your repo has its own install script, set `dotfiles_install_script` to its
 path relative to the repo root and it runs after cloning, instead of using

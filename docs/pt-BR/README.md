@@ -220,10 +220,16 @@ As entradas de PATH passam por uma função auxiliar que só acrescenta quando o
 caminho ainda não está lá, então carregar o arquivo duas vezes — o que
 acontece, já que o `.profile` carrega o `.bashrc` — não duplica nada.
 
-Uma limitação: um `bash -c` não interativo não lê nenhum arquivo de
-configuração, por definição, e portanto não enxerga essas ferramentas. Isso
-afeta scripts e alguns terminais integrados de editor. O
-`~/.config/environment.d/` é a resposta independente de shell nesse caso.
+Arquivos de configuração de shell só cobrem shells. Scripts, terminais
+integrados de editor e agentes de código rodam shells não interativos, que não
+leem nenhum desses arquivos — por definição. Por isso o playbook também escreve
+o `~/.config/environment.d/10-laptop-setup.conf` (`session_env_file`), que o
+systemd aplica à sessão inteira do usuário. Todo processo iniciado depois disso
+herda os caminhos das ferramentas, use ele shell ou não.
+
+**Só passa a valer no próximo login.** Até você sair e entrar de novo, agentes
+e scripts ainda vão dizer que as ferramentas não existem, mesmo que o seu
+terminal as encontre. Use `session_env_enabled: false` para desativar.
 
 Se o seu repositório tiver um script de instalação próprio, defina
 `dotfiles_install_script` com o caminho relativo à raiz dele; o script roda

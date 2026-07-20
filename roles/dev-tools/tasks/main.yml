@@ -52,6 +52,31 @@
   when: dev_tools_languages.rust.enabled | default(false) | bool
   tags: [rust]
 
+- name: Expose the tools to the whole user session
+  when: session_env_enabled | bool
+  become: false
+  vars:
+    session_path_entries: >-
+      {{ ([uv_bin_dir] if dev_tools_languages.python.enabled | bool else [])
+         + ([nvm_dir ~ '/versions/node/' ~ node_target ~ '/bin']
+            if (dev_tools_languages.node.enabled | bool and node_target is defined) else [])
+         + ([go_install_dir ~ '/go/bin', target_home ~ '/go/bin']
+            if dev_tools_languages.go.enabled | bool else [])
+         + ([cargo_home ~ '/bin'] if dev_tools_languages.rust.enabled | bool else []) }}
+  block:
+    - name: Create the systemd user environment directory
+      ansible.builtin.file:
+        path: "{{ session_env_file | dirname }}"
+        state: directory
+        mode: "0755"
+
+    - name: Write the session PATH
+      ansible.builtin.copy:
+        dest: "{{ session_env_file }}"
+        mode: "0644"
+        content: |
+          PATH={{ session_path_entries | join(':') }}:${PATH}
+
 - name: Find which shell rc files exist
   ansible.builtin.stat:
     path: "{{ target_home }}/{{ item }}"
