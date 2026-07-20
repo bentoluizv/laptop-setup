@@ -147,6 +147,9 @@ flatpak_remote_name: flathub
 flatpak_remote_url: https://dl.flathub.org/repo/flathub.flatpakrepo
 flatpak_packages: []
 
+claude_desktop_enabled: true
+claude_desktop_apt_url: https://downloads.claude.ai/claude-desktop/apt/stable
+
 security_updates_enabled: true
 security_updates_download_only: false
 security_updates_reboot: false
