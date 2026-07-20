@@ -81,6 +81,10 @@
     - role: snap-flatpak-apps
       tags: [apps, snap, flatpak, gui]
 
+    - role: claude-desktop
+      tags: [claude-desktop, apps, gui]
+      when: claude_desktop_enabled | bool
+
     - role: security-updates
       tags: [security, updates]
       when: security_updates_enabled | bool

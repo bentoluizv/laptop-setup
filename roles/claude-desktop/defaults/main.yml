@@ -1,0 +1,4 @@
+---
+claude_desktop_enabled: true
+claude_desktop_apt_url: https://downloads.claude.ai/claude-desktop/apt/stable
+deb_arch: "{{ 'amd64' if ansible_facts['architecture'] == 'x86_64' else 'arm64' }}"

@@ -17,6 +17,7 @@ Para adaptar a sua própria máquina ou estender o projeto, veja
 | `docker` | Docker Engine + plugin compose | `docker` |
 | `dotfiles` | Clona um repositório de dotfiles e cria os links simbólicos no `$HOME` | `dotfiles` |
 | `snap-flatpak-apps` | Aplicativos gráficos via snap e flatpak | `apps`, `snap`, `flatpak`, `gui` |
+| `claude-desktop` | Aplicativo desktop do Claude, a partir do `.deb` da Anthropic | `claude-desktop`, `apps`, `gui` |
 | `security-updates` | `unattended-upgrades`, restrito ao canal de segurança | `security`, `updates` |
 
 ## Pré-requisitos
@@ -123,6 +124,9 @@ altera um DDEV que já funciona e não é exercitado no CI.
   adiciona uma autoridade certificadora local ao seu sistema; `mkcert
   -uninstall` desfaz.
 - Autentique as CLIs que for usar: `gh auth login`, `aws configure`.
+- Abra o **Claude** e entre com sua conta Anthropic. O aplicativo desktop está
+  em beta no Linux e não se atualiza sozinho — as versões novas chegam com
+  `apt upgrade`, como qualquer outro pacote.
 
 ## Adicionar pacotes
 

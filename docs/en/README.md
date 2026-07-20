@@ -17,6 +17,7 @@ To adopt it for your own machine or extend it, see
 | `docker` | Docker Engine + compose plugin | `docker` |
 | `dotfiles` | Clones a dotfiles repo and symlinks it into `$HOME` | `dotfiles` |
 | `snap-flatpak-apps` | GUI apps via snap and flatpak | `apps`, `snap`, `flatpak`, `gui` |
+| `claude-desktop` | Claude desktop app, from Anthropic's `.deb` | `claude-desktop`, `apps`, `gui` |
 | `security-updates` | `unattended-upgrades`, restricted to the security pocket | `security`, `updates` |
 
 ## Prerequisites
@@ -117,6 +118,9 @@ because it changes a working DDEV setup and is not exercised in CI.
 - Run `mkcert -install` once if you want https on local DDEV sites. It adds a
   local root CA to your system trust store; `mkcert -uninstall` reverses it.
 - Authenticate the CLIs you use: `gh auth login`, `aws configure`.
+- Launch **Claude** and sign in with your Anthropic account. The desktop app is
+  in beta on Linux and does not update itself — new versions arrive with
+  `apt upgrade` like any other package.
 
 ## Add packages
 

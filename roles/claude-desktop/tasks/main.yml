@@ -1,0 +1,58 @@
+---
+- name: Check whether the Claude desktop app is installed
+  ansible.builtin.command: dpkg-query -W -f=${Status} claude-desktop
+  register: claude_desktop_status
+  changed_when: false
+  failed_when: false
+
+- name: Install the Claude desktop app from Anthropic's package pool
+  when: "'install ok installed' not in claude_desktop_status.stdout"
+  block:
+    - name: Look up the newest desktop package for this architecture
+      ansible.builtin.shell:
+        cmd: |
+          set -o pipefail
+          curl -fsSL "{{ claude_desktop_apt_url }}/dists/stable/main/binary-{{ deb_arch }}/Packages" \
+          | awk -v RS='' '
+              /(^|\n)Package: claude-desktop(\n|$)/ {
+                ver=fn=sum=""; n=split($0, L, "\n")
+                for (i=1;i<=n;i++) {
+                  if (L[i] ~ /^Version: /)  ver=substr(L[i], 10)
+                  if (L[i] ~ /^Filename: /) fn =substr(L[i], 11)
+                  if (L[i] ~ /^SHA256: /)   sum=substr(L[i], 9)
+                }
+                print ver"\t"fn"\t"sum
+              }' \
+          | sort -V | tail -n1
+        executable: /bin/bash
+      register: claude_desktop_pool
+      changed_when: false
+
+    - name: Require a versioned .deb with a checksum from the package index
+      ansible.builtin.assert:
+        that:
+          - claude_desktop_fields | length == 3
+          - claude_desktop_fields[1] is match('pool/.*\.deb\Z')
+          - claude_desktop_fields[2] is match('[0-9a-f]{64}\Z')
+        fail_msg: >-
+          No claude-desktop .deb for {{ deb_arch }} in the package index at
+          {{ claude_desktop_apt_url }}. Got: {{ claude_desktop_pool.stdout }}
+      vars:
+        claude_desktop_fields: "{{ claude_desktop_pool.stdout.split('\t') }}"
+
+    - name: Download the .deb, verified against the index checksum
+      ansible.builtin.get_url:
+        url: "{{ claude_desktop_apt_url }}/{{ claude_desktop_pool.stdout.split('\t')[1] }}"
+        dest: /tmp/claude-desktop.deb
+        checksum: "sha256:{{ claude_desktop_pool.stdout.split('\t')[2] }}"
+        mode: "0644"
+
+    - name: Install the downloaded package
+      ansible.builtin.apt:
+        deb: /tmp/claude-desktop.deb
+      become: true
+
+    - name: Remove the downloaded .deb
+      ansible.builtin.file:
+        path: /tmp/claude-desktop.deb
+        state: absent
